@@ -1,6 +1,7 @@
 #include "fluval_ble_led.h"
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
+#include "esphome/core/time.h"
 
 #ifdef USE_ESP32
 
@@ -289,7 +290,9 @@ void FluvalBleLed::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t
 
       ESP_LOGVV(TAG, "READ CHARS FROM %d with status %d: %s ", param->read.handle, param->read.status,
                 this->pkt_to_hex_(param->read.value, param->read.value_len - 1).c_str());
-
+      
+      // HANDSHAKE STEP 1
+      // ================
       if (this->handshake_step_ == 1) {
         std::vector<uint8_t> header2{0x47};
         ESP_LOGD(TAG, "Writing Header 2 (REG 0x47");
@@ -300,15 +303,15 @@ void FluvalBleLed::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t
         this->handshake_step_ = 2;
       }
 
-      if (this->handshake_step_ == 3) {
-        this->sync_time();
+      // HANDSHAKE STEP 3
+      // ================
+      if (this->handshake_step_ == 3) {   
+        this->sync_time();     
         ESP_LOGI(TAG, "Connected to Fluval LED [%s]", this->parent_->address_str().c_str());
-
         // Sending device read request as last part of the handshake
         std::vector<uint8_t> update{0x68, 0x05};
-        this->send_packet_(update);
-
-        this->handshake_step_ = 4;
+        this->send_packet_(update);        
+        this->handshake_step_ = 4;                
       }
 
       break;
@@ -323,6 +326,8 @@ void FluvalBleLed::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t
         break;
       }
 
+      // HANDSHAKE STEP 0
+      // ================
       if (this->handshake_step_ == 0) {
         ESP_LOGD(TAG, "Reading result of Header 1 (REG 0x0F");
         esp_err_t erra2 = esp_ble_gattc_read_char(this->parent()->get_gattc_if(), this->parent()->get_conn_id(),
@@ -331,6 +336,8 @@ void FluvalBleLed::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t
         this->handshake_step_ = 1;
       }
 
+      // HANDSHAKE STEP 2
+      // ================
       if (this->handshake_step_ == 2) {
         ESP_LOGD(TAG, "Reading result of Header 2 (REG 0x47");
         esp_err_t errb2 = esp_ble_gattc_read_char(this->parent()->get_gattc_if(), this->parent()->get_conn_id(),
@@ -338,7 +345,7 @@ void FluvalBleLed::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t
         ESP_LOGD(TAG, "READING 0x47 RESULT: %s", esp_err_to_name(errb2));
         this->handshake_step_ = 3;
       }
-
+  
       break;
     }  // ESP_GATTC_WRITE_CHAR_EVT
 
@@ -458,11 +465,11 @@ void FluvalBleLed::loop() {
 
 void FluvalBleLed::sync_time() {
   auto *time_id = *this->time_;
-  time::ESPTime now = time_id->now();
+  ESPTime now = time_id->now();
 
   if (now.is_valid()) {
     uint8_t year = now.year - 2000;
-    uint8_t month = 0;  // currentTime.month; // 00 in the app?
+    uint8_t month = now.month; // 00 in the app?
     uint8_t day = now.day_of_month;
     uint8_t day_of_week = now.day_of_week == 1 ? 7 : now.day_of_week - 1;
     uint8_t hour = now.hour;
@@ -471,11 +478,11 @@ void FluvalBleLed::sync_time() {
     uint8_t checksum = 0x68 ^ 0x0E ^ year ^ month ^ day ^ day_of_week ^ hour ^ minute ^ second;
 
     ESP_LOGD(TAG,
-             "Year: %d / Month: %d / Day: %d / Day of week: %d / Hour: %d / Minute: %d / Second: %d / Checksumm: %d",
-             year, month, day, day_of_week, hour, minute, second, checksum);
+             "Syncing time with Fluval: Year: %d / Month: %d / Day: %d / Day of week: %d / Hour: %d / Minute: %d / Second: %d",
+             year, month, day, day_of_week, hour, minute, second);
 
-    std::vector<uint8_t> value{0x68, 0x0E, year, month, day, day_of_week, hour, minute, second, checksum};
-    this->send_packet_(value);
+    std::vector<uint8_t> value_sync{0x68, 0x0E, year, month, day, day_of_week, hour, minute, second};
+    this->send_packet_(value_sync);    
   }
 }
 #endif
