@@ -27,7 +27,7 @@ def validate_min_max(config):
     return config
 
 
-CONFIG_SCHEMA = (
+CONFIG_SCHEMA = cv.Schema(
     number.number_schema(FluvalBleChannelNumber)
     .extend(
         {
@@ -39,8 +39,8 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_STEP, default=100): cv.positive_float,
         }
     )
-    .extend(cv.COMPONENT_SCHEMA)
-    .extend(fluval_ble_led.FLUVAL_CLIENT_SCHEMA),
+    .extend(fluval_ble_led.FLUVAL_CLIENT_SCHEMA)
+    .extend(cv.COMPONENT_SCHEMA),
     validate_min_max,
 )
 
