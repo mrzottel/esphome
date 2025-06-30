@@ -13,7 +13,7 @@ FluvalBleLedSelectModeButton = fluval_ble_led_ns.class_(
     fluval_ble_led.FluvalBleLed,
 )
 
-CONFIG_SCHEMA = (
+CONFIG_SCHEMA = cv.Schema(
     button.button_schema(FluvalBleLedSelectModeButton)
     .extend(
         {
