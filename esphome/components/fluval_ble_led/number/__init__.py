@@ -28,7 +28,7 @@ def validate_min_max(config):
 
 
 CONFIG_SCHEMA = cv.All(
-    number.number_schema(
+    number.number_schema.extend(
         {
             cv.GenerateID(): cv.declare_id(FluvalBleChannelNumber),
             cv.Required(CONF_CHANNEL): int,
