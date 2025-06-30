@@ -40,7 +40,8 @@ CONFIG_SCHEMA = (
         }
     )
     .extend(cv.COMPONENT_SCHEMA)
-    .extend(fluval_ble_led.FLUVAL_CLIENT_SCHEMA)
+    .extend(fluval_ble_led.FLUVAL_CLIENT_SCHEMA),
+    validate_min_max,
 )
 
 
