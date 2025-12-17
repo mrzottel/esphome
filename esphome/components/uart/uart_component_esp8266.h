@@ -9,8 +9,7 @@
 #include "esphome/core/log.h"
 #include "uart_component.h"
 
-namespace esphome {
-namespace uart {
+namespace esphome::uart {
 
 class ESP8266SoftwareSerial {
  public:
@@ -63,6 +62,21 @@ class ESP8266UartComponent : public UARTComponent, public Component {
 
   uint32_t get_config();
 
+  /**
+   * Load the UART with the current settings.
+   * @param dump_config (Optional, default `true`): True for displaying new settings or
+   * false to change it quitely
+   *
+   * Example:
+   * ```cpp
+   * id(uart1).load_settings();
+   * ```
+   *
+   * This will load the current UART interface with the latest settings (baud_rate, parity, etc).
+   */
+  void load_settings(bool dump_config) override;
+  void load_settings() override { this->load_settings(true); }
+
  protected:
   void check_logger_conflict() override;
 
@@ -73,7 +87,5 @@ class ESP8266UartComponent : public UARTComponent, public Component {
   static bool serial0_in_use;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 };
 
-}  // namespace uart
-}  // namespace esphome
-
+}  // namespace esphome::uart
 #endif  // USE_ESP8266

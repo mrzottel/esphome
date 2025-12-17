@@ -9,8 +9,7 @@
 #include "esphome/components/logger/logger.h"
 #endif
 
-namespace esphome {
-namespace uart {
+namespace esphome::uart {
 
 static const char *const TAG = "uart.arduino_esp8266";
 bool ESP8266UartComponent::serial0_in_use = false;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
@@ -56,7 +55,21 @@ uint32_t ESP8266UartComponent::get_config() {
 }
 
 void ESP8266UartComponent::setup() {
-  ESP_LOGCONFIG(TAG, "Setting up UART bus...");
+  auto setup_pin_if_needed = [](InternalGPIOPin *pin) {
+    if (!pin) {
+      return;
+    }
+    const auto mask = gpio::Flags::FLAG_OPEN_DRAIN | gpio::Flags::FLAG_PULLUP | gpio::Flags::FLAG_PULLDOWN;
+    if ((pin->get_flags() & mask) != gpio::Flags::FLAG_NONE) {
+      pin->setup();
+    }
+  };
+
+  setup_pin_if_needed(this->rx_pin_);
+  if (this->rx_pin_ != this->tx_pin_) {
+    setup_pin_if_needed(this->tx_pin_);
+  }
+
   // Use Arduino HardwareSerial UARTs if all used pins match the ones
   // preconfigured by the platform. For example if RX disabled but TX pin
   // is 1 we still want to use Serial.
@@ -98,17 +111,35 @@ void ESP8266UartComponent::setup() {
   }
 }
 
+void ESP8266UartComponent::load_settings(bool dump_config) {
+  ESP_LOGCONFIG(TAG, "Loading UART bus settings");
+  if (this->hw_serial_ != nullptr) {
+    SerialConfig config = static_cast<SerialConfig>(get_config());
+    this->hw_serial_->begin(this->baud_rate_, config);
+    this->hw_serial_->setRxBufferSize(this->rx_buffer_size_);
+  } else {
+    this->sw_serial_->setup(this->tx_pin_, this->rx_pin_, this->baud_rate_, this->stop_bits_, this->data_bits_,
+                            this->parity_, this->rx_buffer_size_);
+  }
+  if (dump_config) {
+    ESP_LOGCONFIG(TAG, "UART bus was reloaded.");
+    this->dump_config();
+  }
+}
+
 void ESP8266UartComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "UART Bus:");
-  LOG_PIN("  TX Pin: ", tx_pin_);
-  LOG_PIN("  RX Pin: ", rx_pin_);
+  LOG_PIN("  TX Pin: ", this->tx_pin_);
+  LOG_PIN("  RX Pin: ", this->rx_pin_);
   if (this->rx_pin_ != nullptr) {
     ESP_LOGCONFIG(TAG, "  RX Buffer Size: %u", this->rx_buffer_size_);  // NOLINT
   }
-  ESP_LOGCONFIG(TAG, "  Baud Rate: %u baud", this->baud_rate_);
-  ESP_LOGCONFIG(TAG, "  Data Bits: %u", this->data_bits_);
-  ESP_LOGCONFIG(TAG, "  Parity: %s", LOG_STR_ARG(parity_to_str(this->parity_)));
-  ESP_LOGCONFIG(TAG, "  Stop bits: %u", this->stop_bits_);
+  ESP_LOGCONFIG(TAG,
+                "  Baud Rate: %u baud\n"
+                "  Data Bits: %u\n"
+                "  Parity: %s\n"
+                "  Stop bits: %u",
+                this->baud_rate_, this->data_bits_, LOG_STR_ARG(parity_to_str(this->parity_)), this->stop_bits_);
   if (this->hw_serial_ != nullptr) {
     ESP_LOGCONFIG(TAG, "  Using hardware serial interface.");
   } else {
@@ -177,7 +208,7 @@ int ESP8266UartComponent::available() {
   }
 }
 void ESP8266UartComponent::flush() {
-  ESP_LOGVV(TAG, "    Flushing...");
+  ESP_LOGVV(TAG, "    Flushing");
   if (this->hw_serial_ != nullptr) {
     this->hw_serial_->flush();
   } else {
@@ -299,6 +330,5 @@ int ESP8266SoftwareSerial::available() {
   return avail;
 }
 
-}  // namespace uart
-}  // namespace esphome
+}  // namespace esphome::uart
 #endif  // USE_ESP8266

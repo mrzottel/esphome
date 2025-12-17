@@ -1,9 +1,9 @@
 #pragma once
 
-#include "esphome/core/log.h"
 #include "esphome/core/helpers.h"
-#include "ndef_record.h"
+#include "esphome/core/log.h"
 #include "ndef_message.h"
+#include "ndef_record.h"
 #include "nfc_tag.h"
 
 #include <vector>
@@ -53,8 +53,8 @@ static const uint8_t DEFAULT_KEY[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 static const uint8_t NDEF_KEY[6] = {0xD3, 0xF7, 0xD3, 0xF7, 0xD3, 0xF7};
 static const uint8_t MAD_KEY[6] = {0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5};
 
-std::string format_uid(std::vector<uint8_t> &uid);
-std::string format_bytes(std::vector<uint8_t> &bytes);
+std::string format_uid(const std::vector<uint8_t> &uid);
+std::string format_bytes(const std::vector<uint8_t> &bytes);
 
 uint8_t guess_tag_type(uint8_t uid_length);
 uint8_t get_mifare_classic_ndef_start_index(std::vector<uint8_t> &data);
@@ -65,6 +65,20 @@ bool mifare_classic_is_first_block(uint8_t block_num);
 bool mifare_classic_is_trailer_block(uint8_t block_num);
 
 uint32_t get_mifare_ultralight_buffer_size(uint32_t message_length);
+
+class NfcTagListener {
+ public:
+  virtual void tag_off(NfcTag &tag) {}
+  virtual void tag_on(NfcTag &tag) {}
+};
+
+class Nfcc {
+ public:
+  void register_listener(NfcTagListener *listener) { this->tag_listeners_.push_back(listener); }
+
+ protected:
+  std::vector<NfcTagListener *> tag_listeners_;
+};
 
 }  // namespace nfc
 }  // namespace esphome

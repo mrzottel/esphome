@@ -20,6 +20,12 @@ static const uint8_t PN532_COMMAND_INDATAEXCHANGE = 0x40;
 static const uint8_t PN532_COMMAND_INLISTPASSIVETARGET = 0x4A;
 static const uint8_t PN532_COMMAND_POWERDOWN = 0x16;
 
+enum PN532ReadReady {
+  WOULDBLOCK = 0,
+  TIMEOUT,
+  READY,
+};
+
 class PN532BinarySensor;
 
 class PN532 : public PollingComponent {
@@ -32,7 +38,7 @@ class PN532 : public PollingComponent {
   float get_setup_priority() const override;
 
   void loop() override;
-  void on_shutdown() override { powerdown(); }
+  void on_powerdown() override { powerdown(); }
 
   void register_tag(PN532BinarySensor *tag) { this->binary_sensors_.push_back(tag); }
   void register_ontag_trigger(nfc::NfcOnTagTrigger *trig) { this->triggers_ontag_.push_back(trig); }
@@ -54,8 +60,11 @@ class PN532 : public PollingComponent {
   void turn_off_rf_();
   bool write_command_(const std::vector<uint8_t> &data);
   bool read_ack_();
+  void send_ack_();
   void send_nack_();
 
+  enum PN532ReadReady read_ready_(bool block);
+  virtual bool is_read_ready() = 0;
   virtual bool write_data(const std::vector<uint8_t> &data) = 0;
   virtual bool read_data(std::vector<uint8_t> &data, uint8_t len) = 0;
   virtual bool read_response(uint8_t command, std::vector<uint8_t> &data) = 0;
@@ -91,6 +100,8 @@ class PN532 : public PollingComponent {
   std::vector<nfc::NfcOnTagTrigger *> triggers_ontagremoved_;
   std::vector<uint8_t> current_uid_;
   nfc::NdefMessage *next_task_message_to_write_;
+  uint32_t rd_start_time_{0};
+  enum PN532ReadReady rd_ready_ { WOULDBLOCK };
   enum NfcTask {
     READ = 0,
     CLEAN,
@@ -132,7 +143,7 @@ class PN532OnFinishedWriteTrigger : public Trigger<> {
 
 template<typename... Ts> class PN532IsWritingCondition : public Condition<Ts...>, public Parented<PN532> {
  public:
-  bool check(Ts... x) override { return this->parent_->is_writing(); }
+  bool check(const Ts &...x) override { return this->parent_->is_writing(); }
 };
 
 }  // namespace pn532

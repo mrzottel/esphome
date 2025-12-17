@@ -4,6 +4,7 @@
 #include "esphome/core/defines.h"
 #include "esphome/core/hal.h"
 #include "esphome/core/time.h"
+#include "esphome/components/display/display.h"
 
 #include <vector>
 
@@ -19,7 +20,7 @@ class TM1637Display;
 class TM1637Key;
 #endif
 
-using tm1637_writer_t = std::function<void(TM1637Display &)>;
+using tm1637_writer_t = display::DisplayWriter<TM1637Display>;
 
 class TM1637Display : public PollingComponent {
  public:
@@ -49,6 +50,7 @@ class TM1637Display : public PollingComponent {
   void set_intensity(uint8_t intensity) { this->intensity_ = intensity; }
   void set_inverted(bool inverted) { this->inverted_ = inverted; }
   void set_length(uint8_t length) { this->length_ = length; }
+  void set_on(bool on) { this->on_ = on; }
 
   void display();
 
@@ -76,7 +78,8 @@ class TM1637Display : public PollingComponent {
   uint8_t intensity_;
   uint8_t length_;
   bool inverted_;
-  optional<tm1637_writer_t> writer_{};
+  bool on_{true};
+  tm1637_writer_t writer_{};
   uint8_t buffer_[6] = {0};
 #ifdef USE_BINARY_SENSOR
   std::vector<TM1637Key *> tm1637_keys_{};

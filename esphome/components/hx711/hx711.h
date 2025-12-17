@@ -4,10 +4,12 @@
 #include "esphome/core/hal.h"
 #include "esphome/components/sensor/sensor.h"
 
+#include <cinttypes>
+
 namespace esphome {
 namespace hx711 {
 
-enum HX711Gain {
+enum HX711Gain : uint8_t {
   HX711_GAIN_128 = 1,
   HX711_GAIN_32 = 2,
   HX711_GAIN_64 = 3,

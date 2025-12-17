@@ -7,8 +7,7 @@
 
 #ifdef USE_ESP32
 #include <esp_gattc_api.h>
-namespace esphome {
-namespace ble_client {
+namespace esphome::ble_client {
 
 namespace espbt = esphome::esp32_ble_tracker;
 
@@ -16,7 +15,6 @@ class BLEBinaryOutput : public output::BinaryOutput, public BLEClientNode, publi
  public:
   void dump_config() override;
   void loop() override {}
-  float get_setup_priority() const override { return setup_priority::DATA; }
   void set_service_uuid16(uint16_t uuid) { this->service_uuid_ = espbt::ESPBTUUID::from_uint16(uuid); }
   void set_service_uuid32(uint32_t uuid) { this->service_uuid_ = espbt::ESPBTUUID::from_uint32(uuid); }
   void set_service_uuid128(uint8_t *uuid) { this->service_uuid_ = espbt::ESPBTUUID::from_raw(uuid); }
@@ -32,10 +30,11 @@ class BLEBinaryOutput : public output::BinaryOutput, public BLEClientNode, publi
   bool require_response_;
   espbt::ESPBTUUID service_uuid_;
   espbt::ESPBTUUID char_uuid_;
-  espbt::ClientState client_state_;
+  uint16_t char_handle_{};
+  esp_gatt_char_prop_t char_props_{};
+  esp_gatt_write_type_t write_type_{};
 };
 
-}  // namespace ble_client
-}  // namespace esphome
+}  // namespace esphome::ble_client
 
 #endif

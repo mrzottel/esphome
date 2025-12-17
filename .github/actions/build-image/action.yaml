@@ -1,0 +1,98 @@
+name: Build Image
+inputs:
+  target:
+    description: "Target to build"
+    required: true
+    example: "docker"
+  build_type:
+    description: "Build type"
+    required: true
+    example: "docker"
+  suffix:
+    description: "Suffix to add to tags"
+    required: true
+  version:
+    description: "Version to build"
+    required: true
+    example: "2023.12.0"
+  base_os:
+    description: "Base OS to use"
+    required: false
+    default: "debian"
+    example: "debian"
+runs:
+  using: "composite"
+  steps:
+    - name: Generate short tags
+      id: tags
+      shell: bash
+      run: |
+        output=$(docker/generate_tags.py \
+          --tag "${{ inputs.version }}" \
+          --suffix "${{ inputs.suffix }}")
+        echo $output
+        for l in $output; do
+          echo $l >> $GITHUB_OUTPUT
+        done
+
+    # set cache-to only if dev branch
+    - id: cache-to
+      shell: bash
+      run: |-
+        if [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
+          echo "value=type=gha,mode=max" >> $GITHUB_OUTPUT
+        else
+          echo "value=" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Build and push to ghcr by digest
+      id: build-ghcr
+      uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+      env:
+        DOCKER_BUILD_SUMMARY: false
+        DOCKER_BUILD_RECORD_UPLOAD: false
+      with:
+        context: .
+        file: ./docker/Dockerfile
+        target: ${{ inputs.target }}
+        cache-from: type=gha
+        cache-to: ${{ steps.cache-to.outputs.value }}
+        build-args: |
+          BUILD_TYPE=${{ inputs.build_type }}
+          BUILD_VERSION=${{ inputs.version }}
+          BUILD_OS=${{ inputs.base_os }}
+        outputs: |
+          type=image,name=ghcr.io/${{ steps.tags.outputs.image_name }},push-by-digest=true,name-canonical=true,push=true
+
+    - name: Export ghcr digests
+      shell: bash
+      run: |
+        mkdir -p /tmp/digests/${{ inputs.build_type }}/ghcr
+        digest="${{ steps.build-ghcr.outputs.digest }}"
+        touch "/tmp/digests/${{ inputs.build_type }}/ghcr/${digest#sha256:}"
+
+    - name: Build and push to dockerhub by digest
+      id: build-dockerhub
+      uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+      env:
+        DOCKER_BUILD_SUMMARY: false
+        DOCKER_BUILD_RECORD_UPLOAD: false
+      with:
+        context: .
+        file: ./docker/Dockerfile
+        target: ${{ inputs.target }}
+        cache-from: type=gha
+        cache-to: ${{ steps.cache-to.outputs.value }}
+        build-args: |
+          BUILD_TYPE=${{ inputs.build_type }}
+          BUILD_VERSION=${{ inputs.version }}
+          BUILD_OS=${{ inputs.base_os }}
+        outputs: |
+          type=image,name=docker.io/${{ steps.tags.outputs.image_name }},push-by-digest=true,name-canonical=true,push=true
+
+    - name: Export dockerhub digests
+      shell: bash
+      run: |
+        mkdir -p /tmp/digests/${{ inputs.build_type }}/dockerhub
+        digest="${{ steps.build-dockerhub.outputs.digest }}"
+        touch "/tmp/digests/${{ inputs.build_type }}/dockerhub/${digest#sha256:}"

@@ -1,93 +1,56 @@
-# Build these with the build.py script
-# Example:
-#   python3 docker/build.py --tag dev --arch amd64 --build-type docker build
+ARG BUILD_VERSION=dev
+ARG BUILD_OS=alpine
+ARG BUILD_BASE_VERSION=2025.04.0
+ARG BUILD_TYPE=docker
 
-# One of "docker", "hassio"
-ARG BASEIMGTYPE=docker
+FROM ghcr.io/esphome/docker-base:${BUILD_OS}-${BUILD_BASE_VERSION} AS base-source-docker
+FROM ghcr.io/esphome/docker-base:${BUILD_OS}-ha-addon-${BUILD_BASE_VERSION} AS base-source-ha-addon
 
-# https://github.com/hassio-addons/addon-debian-base/releases
-FROM ghcr.io/hassio-addons/debian-base:6.2.3 AS base-hassio
-# https://hub.docker.com/_/debian?tab=tags&page=1&name=bullseye
-FROM debian:bullseye-20230208-slim AS base-docker
+ARG BUILD_TYPE
+FROM base-source-${BUILD_TYPE} AS base
 
-FROM base-${BASEIMGTYPE} AS base
+RUN git config --system --add safe.directory "*"
 
-ARG TARGETARCH
-ARG TARGETVARIANT
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 
-RUN \
-    apt-get update \
-    # Use pinned versions so that we get updates with build caching
-    && apt-get install -y --no-install-recommends \
-        python3=3.9.2-3 \
-        python3-pip=20.3.4-4+deb11u1 \
-        python3-setuptools=52.0.0-4 \
-        python3-cryptography=3.3.2-1 \
-        python3-venv=3.9.2-3 \
-        iputils-ping=3:20210202-1 \
-        git=1:2.30.2-1+deb11u2 \
-        curl=7.74.0-1.3+deb11u7 \
-        openssh-client=1:8.4p1-5+deb11u1 \
-        python3-cffi=1.14.5-1 \
-        libcairo2=1.16.0-5 \
-        patch=2.7.6-7; \
-    if [ "$TARGETARCH$TARGETVARIANT" = "armv7" ]; then \
-        apt-get install -y --no-install-recommends \
-          build-essential=12.9 \
-          python3-dev=3.9.2-3 \
-          zlib1g-dev=1:1.2.11.dfsg-2+deb11u2 \
-          libjpeg-dev=1:2.0.6-4 \
-          libfreetype-dev=2.10.4+dfsg-1+deb11u1; \
-    fi; \
-    rm -rf \
-        /tmp/* \
-        /var/{cache,log}/* \
-        /var/lib/apt/lists/*
+RUN pip install --no-cache-dir -U pip uv==0.6.14
 
-ENV \
-  # Fix click python3 lang warning https://click.palletsprojects.com/en/7.x/python3/
-  LANG=C.UTF-8 LC_ALL=C.UTF-8 \
-  # Store globally installed pio libs in /piolibs
-  PLATFORMIO_GLOBALLIB_DIR=/piolibs
-
-# Support legacy binaries on Debian multiarch system. There is no "correct" way
-# to do this, other than using properly built toolchains...
-# See: https://unix.stackexchange.com/questions/553743/correct-way-to-add-lib-ld-linux-so-3-in-debian
-RUN \
-    if [ "$TARGETARCH$TARGETVARIANT" = "armv7" ]; then \
-        ln -s /lib/arm-linux-gnueabihf/ld-linux.so.3 /lib/ld-linux.so.3; \
-    fi
+COPY requirements.txt /
 
 RUN \
-    # Ubuntu python3-pip is missing wheel
-    pip3 install --no-cache-dir \
-        wheel==0.37.1 \
-        platformio==6.1.11 \
-    # Change some platformio settings
-    && platformio settings set enable_telemetry No \
+    uv pip install --no-cache-dir \
+    -r /requirements.txt
+
+RUN \
+    platformio settings set enable_telemetry No \
     && platformio settings set check_platformio_interval 1000000 \
     && mkdir -p /piolibs
 
+COPY script/platformio_install_deps.py platformio.ini /
+RUN /platformio_install_deps.py /platformio.ini --libraries
 
-# First install requirements to leverage caching when requirements don't change
-COPY requirements.txt requirements_optional.txt script/platformio_install_deps.py platformio.ini /
-RUN \
-    pip3 install --no-cache-dir -r /requirements.txt -r /requirements_optional.txt \
-    && /platformio_install_deps.py /platformio.ini --libraries
+ARG BUILD_VERSION
+
+LABEL \
+    org.opencontainers.image.authors="The ESPHome Authors" \
+    org.opencontainers.image.title="ESPHome" \
+    org.opencontainers.image.description="ESPHome is a system to configure your microcontrollers by simple yet powerful configuration files and control them remotely through Home Automation systems" \
+    org.opencontainers.image.url="https://esphome.io/" \
+    org.opencontainers.image.documentation="https://esphome.io/" \
+    org.opencontainers.image.source="https://github.com/esphome/esphome" \
+    org.opencontainers.image.licenses="ESPHome" \
+    org.opencontainers.image.version=${BUILD_VERSION}
 
 
 # ======================= docker-type image =======================
-FROM base AS docker
-
-# Copy esphome and install
-COPY . /esphome
-RUN pip3 install --no-cache-dir --no-use-pep517 -e /esphome
-
-# Settings for dashboard
-ENV USERNAME="" PASSWORD=""
+FROM base AS base-docker
 
 # Expose the dashboard to Docker
 EXPOSE 6052
+
+# Run healthcheck (heartbeat)
+HEALTHCHECK --interval=30s --timeout=30s \
+    CMD curl --fail http://localhost:6052/version -A "HealthCheck" || exit 1
 
 COPY docker/docker_entrypoint.sh /entrypoint.sh
 
@@ -101,65 +64,23 @@ ENTRYPOINT ["/entrypoint.sh"]
 CMD ["dashboard", "/config"]
 
 
-
-
-# ======================= hassio-type image =======================
-FROM base AS hassio
-
-RUN \
-    apt-get update \
-    # Use pinned versions so that we get updates with build caching
-    && apt-get install -y --no-install-recommends \
-        nginx-light=1.18.0-6.1+deb11u3 \
-    && rm -rf \
-        /tmp/* \
-        /var/{cache,log}/* \
-        /var/lib/apt/lists/*
-
-ARG BUILD_VERSION=dev
+# ======================= ha-addon-type image =======================
+FROM base AS base-ha-addon
 
 # Copy root filesystem
 COPY docker/ha-addon-rootfs/ /
 
-# Copy esphome and install
-COPY . /esphome
-RUN pip3 install --no-cache-dir --no-use-pep517 -e /esphome
-
-# Labels
+ARG BUILD_VERSION
 LABEL \
     io.hass.name="ESPHome" \
-    io.hass.description="Manage and program ESP8266/ESP32 microcontrollers through YAML configuration files" \
+    io.hass.description="ESPHome is a system to configure your microcontrollers by simple yet powerful configuration files and control them remotely through Home Automation systems" \
     io.hass.type="addon" \
     io.hass.version="${BUILD_VERSION}"
     # io.hass.arch is inherited from addon-debian-base
 
+ARG BUILD_TYPE
+FROM base-${BUILD_TYPE} AS final
 
-
-
-# ======================= lint-type image =======================
-FROM base AS lint
-
-ENV \
-  PLATFORMIO_CORE_DIR=/esphome/.temp/platformio
-
-RUN \
-    apt-get update \
-    # Use pinned versions so that we get updates with build caching
-    && apt-get install -y --no-install-recommends \
-        clang-format-13=1:13.0.1-6~deb11u1 \
-        clang-tidy-11=1:11.0.1-2 \
-        patch=2.7.6-7 \
-        software-properties-common=0.96.20.2-2.1 \
-        nano=5.4-2+deb11u2 \
-        build-essential=12.9 \
-        python3-dev=3.9.2-3 \
-    && rm -rf \
-        /tmp/* \
-        /var/{cache,log}/* \
-        /var/lib/apt/lists/*
-
-COPY requirements_test.txt /
-RUN pip3 install --no-cache-dir -r /requirements_test.txt
-
-VOLUME ["/esphome"]
-WORKDIR /esphome
+# Copy esphome and install
+COPY . /esphome
+RUN uv pip install --no-cache-dir -e /esphome

@@ -1,11 +1,11 @@
 import esphome.codegen as cg
-import esphome.config_validation as cv
 from esphome.components import sensor
+import esphome.config_validation as cv
 from esphome.const import (
-    CONF_ID,
     CONF_COMMAND,
     CONF_CUSTOM,
     CONF_DEST,
+    CONF_ID,
     CONF_LAMBDA,
     CONF_MODEL,
     CONF_SENSORS,
@@ -22,21 +22,23 @@ from esphome.const import (
     ICON_THERMOMETER,
     ICON_TIMER,
     STATE_CLASS_MEASUREMENT,
+    STATE_CLASS_TOTAL_INCREASING,
     UNIT_CELSIUS,
     UNIT_HOUR,
     UNIT_MINUTE,
     UNIT_PERCENT,
     UNIT_WATT_HOURS,
 )
+
 from .. import (
-    vbus_ns,
-    VBus,
-    CONF_VBUS_ID,
-    CONF_DELTASOL_BS_PLUS,
     CONF_DELTASOL_BS_2009,
+    CONF_DELTASOL_BS_PLUS,
     CONF_DELTASOL_C,
     CONF_DELTASOL_CS2,
     CONF_DELTASOL_CS_PLUS,
+    CONF_VBUS_ID,
+    VBus,
+    vbus_ns,
 )
 
 DeltaSol_BS_Plus = vbus_ns.class_("DeltaSolBSPlusSensor", cg.Component)
@@ -128,7 +130,7 @@ CONFIG_SCHEMA = cv.typed_schema(
                     icon=ICON_RADIATOR,
                     accuracy_decimals=0,
                     device_class=DEVICE_CLASS_ENERGY,
-                    state_class=STATE_CLASS_MEASUREMENT,
+                    state_class=STATE_CLASS_TOTAL_INCREASING,
                 ),
                 cv.Optional(CONF_TIME): sensor.sensor_schema(
                     unit_of_measurement=UNIT_MINUTE,
@@ -209,7 +211,7 @@ CONFIG_SCHEMA = cv.typed_schema(
                     icon=ICON_RADIATOR,
                     accuracy_decimals=0,
                     device_class=DEVICE_CLASS_ENERGY,
-                    state_class=STATE_CLASS_MEASUREMENT,
+                    state_class=STATE_CLASS_TOTAL_INCREASING,
                 ),
                 cv.Optional(CONF_TIME): sensor.sensor_schema(
                     unit_of_measurement=UNIT_MINUTE,
@@ -290,7 +292,7 @@ CONFIG_SCHEMA = cv.typed_schema(
                     icon=ICON_RADIATOR,
                     accuracy_decimals=0,
                     device_class=DEVICE_CLASS_ENERGY,
-                    state_class=STATE_CLASS_MEASUREMENT,
+                    state_class=STATE_CLASS_TOTAL_INCREASING,
                 ),
                 cv.Optional(CONF_TIME): sensor.sensor_schema(
                     unit_of_measurement=UNIT_MINUTE,
@@ -353,7 +355,7 @@ CONFIG_SCHEMA = cv.typed_schema(
                     icon=ICON_RADIATOR,
                     accuracy_decimals=0,
                     device_class=DEVICE_CLASS_ENERGY,
-                    state_class=STATE_CLASS_MEASUREMENT,
+                    state_class=STATE_CLASS_TOTAL_INCREASING,
                 ),
                 cv.Optional(CONF_VERSION): sensor.sensor_schema(
                     accuracy_decimals=2,
@@ -433,7 +435,7 @@ CONFIG_SCHEMA = cv.typed_schema(
                     icon=ICON_RADIATOR,
                     accuracy_decimals=0,
                     device_class=DEVICE_CLASS_ENERGY,
-                    state_class=STATE_CLASS_MEASUREMENT,
+                    state_class=STATE_CLASS_TOTAL_INCREASING,
                 ),
                 cv.Optional(CONF_TIME): sensor.sensor_schema(
                     unit_of_measurement=UNIT_MINUTE,

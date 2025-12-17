@@ -4,13 +4,14 @@
 #include "esphome/core/time.h"
 
 #include "esphome/components/spi/spi.h"
+#include "esphome/components/display/display.h"
 
 namespace esphome {
 namespace max7219 {
 
 class MAX7219Component;
 
-using max7219_writer_t = std::function<void(MAX7219Component &)>;
+using max7219_writer_t = display::DisplayWriter<MAX7219Component>;
 
 class MAX7219Component : public PollingComponent,
                          public spi::SPIDevice<spi::BIT_ORDER_MSB_FIRST, spi::CLOCK_POLARITY_LOW,
@@ -52,11 +53,12 @@ class MAX7219Component : public PollingComponent,
   void send_byte_(uint8_t a_register, uint8_t data);
   void send_to_all_(uint8_t a_register, uint8_t data);
 
-  uint8_t intensity_{15};  /// Intensity of the display from 0 to 15 (most)
+  uint8_t intensity_{15};     // Intensity of the display from 0 to 15 (most)
+  bool intensity_changed_{};  // True if we need to re-send the intensity
   uint8_t num_chips_{1};
   uint8_t *buffer_;
   bool reverse_{false};
-  optional<max7219_writer_t> writer_{};
+  max7219_writer_t writer_{};
 };
 
 }  // namespace max7219
