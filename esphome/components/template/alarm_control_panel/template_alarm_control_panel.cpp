@@ -1,3 +1,4 @@
+
 #include "template_alarm_control_panel.h"
 #include <utility>
 #include "esphome/components/alarm_control_panel/alarm_control_panel.h"
@@ -5,8 +6,7 @@
 #include "esphome/core/helpers.h"
 #include "esphome/core/log.h"
 
-namespace esphome {
-namespace template_ {
+namespace esphome::template_ {
 
 using namespace esphome::alarm_control_panel;
 
@@ -15,52 +15,76 @@ static const char *const TAG = "template.alarm_control_panel";
 TemplateAlarmControlPanel::TemplateAlarmControlPanel(){};
 
 #ifdef USE_BINARY_SENSOR
-void TemplateAlarmControlPanel::add_sensor(binary_sensor::BinarySensor *sensor, uint16_t flags) {
-  this->sensor_map_[sensor] = flags;
+void TemplateAlarmControlPanel::add_sensor(binary_sensor::BinarySensor *sensor, uint16_t flags, AlarmSensorType type) {
+  // Save the flags and type. Assign a store index for the per sensor data type.
+  SensorDataStore sd;
+  sd.last_chime_state = false;
+  AlarmSensor alarm_sensor;
+  alarm_sensor.sensor = sensor;
+  alarm_sensor.info.flags = flags;
+  alarm_sensor.info.type = type;
+  alarm_sensor.info.store_index = this->next_store_index_++;
+  this->sensors_.push_back(alarm_sensor);
+  this->sensor_data_.push_back(sd);
 };
+
+static const LogString *sensor_type_to_string(AlarmSensorType type) {
+  switch (type) {
+    case ALARM_SENSOR_TYPE_INSTANT:
+      return LOG_STR("instant");
+    case ALARM_SENSOR_TYPE_DELAYED_FOLLOWER:
+      return LOG_STR("delayed_follower");
+    case ALARM_SENSOR_TYPE_INSTANT_ALWAYS:
+      return LOG_STR("instant_always");
+    case ALARM_SENSOR_TYPE_DELAYED:
+    default:
+      return LOG_STR("delayed");
+  }
+}
 #endif
 
 void TemplateAlarmControlPanel::dump_config() {
-  ESP_LOGCONFIG(TAG, "TemplateAlarmControlPanel:");
-  ESP_LOGCONFIG(TAG, "  Current State: %s", LOG_STR_ARG(alarm_control_panel_state_to_string(this->current_state_)));
-  ESP_LOGCONFIG(TAG, "  Number of Codes: %u", this->codes_.size());
-  if (!this->codes_.empty())
-    ESP_LOGCONFIG(TAG, "  Requires Code To Arm: %s", YESNO(this->requires_code_to_arm_));
-  ESP_LOGCONFIG(TAG, "  Arming Away Time: %us", (this->arming_away_time_ / 1000));
-  if (this->arming_home_time_ != 0)
-    ESP_LOGCONFIG(TAG, "  Arming Home Time: %us", (this->arming_home_time_ / 1000));
-  if (this->arming_night_time_ != 0)
-    ESP_LOGCONFIG(TAG, "  Arming Night Time: %us", (this->arming_night_time_ / 1000));
-  ESP_LOGCONFIG(TAG, "  Pending Time: %us", (this->pending_time_ / 1000));
-  ESP_LOGCONFIG(TAG, "  Trigger Time: %us", (this->trigger_time_ / 1000));
-  ESP_LOGCONFIG(TAG, "  Supported Features: %u", this->get_supported_features());
+  ESP_LOGCONFIG(TAG,
+                "TemplateAlarmControlPanel:\n"
+                "  Current State: %s\n"
+                "  Number of Codes: %zu\n"
+                "  Requires Code To Arm: %s\n"
+                "  Arming Away Time: %" PRIu32 "s\n"
+                "  Arming Home Time: %" PRIu32 "s\n"
+                "  Arming Night Time: %" PRIu32 "s\n"
+                "  Pending Time: %" PRIu32 "s\n"
+                "  Trigger Time: %" PRIu32 "s\n"
+                "  Supported Features: %" PRIu32,
+                LOG_STR_ARG(alarm_control_panel_state_to_string(this->current_state_)), this->codes_.size(),
+                YESNO(!this->codes_.empty() && this->requires_code_to_arm_), (this->arming_away_time_ / 1000),
+                (this->arming_home_time_ / 1000), (this->arming_night_time_ / 1000), (this->pending_time_ / 1000),
+                (this->trigger_time_ / 1000), this->get_supported_features());
 #ifdef USE_BINARY_SENSOR
-  for (auto sensor_pair : this->sensor_map_) {
-    ESP_LOGCONFIG(TAG, "  Binary Sesnsor:");
-    ESP_LOGCONFIG(TAG, "    Name: %s", sensor_pair.first->get_name().c_str());
-    ESP_LOGCONFIG(TAG, "    Armed home bypass: %s",
-                  TRUEFALSE(sensor_pair.second & BINARY_SENSOR_MODE_BYPASS_ARMED_HOME));
-    ESP_LOGCONFIG(TAG, "    Armed night bypass: %s",
-                  TRUEFALSE(sensor_pair.second & BINARY_SENSOR_MODE_BYPASS_ARMED_NIGHT));
+  for (const auto &alarm_sensor : this->sensors_) {
+    const uint16_t flags = alarm_sensor.info.flags;
+    ESP_LOGCONFIG(TAG,
+                  "  Binary Sensor:\n"
+                  "    Name: %s\n"
+                  "    Type: %s\n"
+                  "    Armed home bypass: %s\n"
+                  "    Armed night bypass: %s\n"
+                  "    Auto bypass: %s\n"
+                  "    Chime mode: %s",
+                  alarm_sensor.sensor->get_name().c_str(), LOG_STR_ARG(sensor_type_to_string(alarm_sensor.info.type)),
+                  TRUEFALSE(flags & BINARY_SENSOR_MODE_BYPASS_ARMED_HOME),
+                  TRUEFALSE(flags & BINARY_SENSOR_MODE_BYPASS_ARMED_NIGHT),
+                  TRUEFALSE(flags & BINARY_SENSOR_MODE_BYPASS_AUTO), TRUEFALSE(flags & BINARY_SENSOR_MODE_CHIME));
   }
 #endif
 }
 
 void TemplateAlarmControlPanel::setup() {
-  ESP_LOGCONFIG(TAG, "Setting up Template AlarmControlPanel '%s'...", this->name_.c_str());
-  switch (this->restore_mode_) {
-    case ALARM_CONTROL_PANEL_ALWAYS_DISARMED:
-      this->current_state_ = ACP_STATE_DISARMED;
-      break;
-    case ALARM_CONTROL_PANEL_RESTORE_DEFAULT_DISARMED: {
-      uint8_t value;
-      this->pref_ = global_preferences->make_preference<uint8_t>(this->get_object_id_hash());
-      if (this->pref_.load(&value)) {
-        this->current_state_ = static_cast<alarm_control_panel::AlarmControlPanelState>(value);
-      } else {
-        this->current_state_ = ACP_STATE_DISARMED;
-      }
-      break;
+  this->current_state_ = ACP_STATE_DISARMED;
+  if (this->restore_mode_ == ALARM_CONTROL_PANEL_RESTORE_DEFAULT_DISARMED) {
+    uint8_t value;
+    this->pref_ = global_preferences->make_preference<uint8_t>(this->get_preference_hash());
+    if (this->pref_.load(&value)) {
+      this->current_state_ = static_cast<alarm_control_panel::AlarmControlPanelState>(value);
     }
   }
   this->desired_state_ = this->current_state_;
@@ -77,6 +101,7 @@ void TemplateAlarmControlPanel::loop() {
       delay = this->arming_night_time_;
     }
     if ((millis() - this->last_update_) > delay) {
+      this->bypass_before_arming();
       this->publish_state(this->desired_state_);
     }
     return;
@@ -86,40 +111,94 @@ void TemplateAlarmControlPanel::loop() {
     this->publish_state(ACP_STATE_TRIGGERED);
     return;
   }
-  auto future_state = this->current_state_;
+  auto next_state = this->current_state_;
   // reset triggered if all clear
   if (this->current_state_ == ACP_STATE_TRIGGERED && this->trigger_time_ > 0 &&
       (millis() - this->last_update_) > this->trigger_time_) {
-    future_state = this->desired_state_;
+    next_state = this->desired_state_;
   }
-  bool trigger = false;
+
+  bool delayed_sensor_faulted = false;
+  bool instant_sensor_faulted = false;
+
 #ifdef USE_BINARY_SENSOR
-  if (this->is_state_armed(future_state)) {
-    // TODO might be better to register change for each sensor in setup...
-    for (auto sensor_pair : this->sensor_map_) {
-      if (sensor_pair.first->state) {
-        if (this->current_state_ == ACP_STATE_ARMED_HOME &&
-            (sensor_pair.second & BINARY_SENSOR_MODE_BYPASS_ARMED_HOME)) {
-          continue;
+  // Test all of the sensors regardless of the alarm panel state
+  for (const auto &alarm_sensor : this->sensors_) {
+    const auto &info = alarm_sensor.info;
+    auto *sensor = alarm_sensor.sensor;
+    // Check for chime zones
+    if (info.flags & BINARY_SENSOR_MODE_CHIME) {
+      // Look for the transition from closed to open
+      if ((!this->sensor_data_[info.store_index].last_chime_state) && (sensor->state)) {
+        // Must be disarmed to chime
+        if (this->current_state_ == ACP_STATE_DISARMED) {
+          this->chime_callback_.call();
         }
-        if (this->current_state_ == ACP_STATE_ARMED_NIGHT &&
-            (sensor_pair.second & BINARY_SENSOR_MODE_BYPASS_ARMED_NIGHT)) {
-          continue;
-        }
-        trigger = true;
-        break;
+      }
+      // Record the sensor state change
+      this->sensor_data_[info.store_index].last_chime_state = sensor->state;
+    }
+    // Check for faulted sensors
+    if (sensor->state) {
+      // Skip if auto bypassed
+      if (std::count(this->bypassed_sensor_indicies_.begin(), this->bypassed_sensor_indicies_.end(),
+                     info.store_index) == 1) {
+        continue;
+      }
+      // Skip if bypass armed home
+      if ((this->current_state_ == ACP_STATE_ARMED_HOME) && (info.flags & BINARY_SENSOR_MODE_BYPASS_ARMED_HOME)) {
+        continue;
+      }
+      // Skip if bypass armed night
+      if ((this->current_state_ == ACP_STATE_ARMED_NIGHT) && (info.flags & BINARY_SENSOR_MODE_BYPASS_ARMED_NIGHT)) {
+        continue;
+      }
+
+      switch (info.type) {
+        case ALARM_SENSOR_TYPE_INSTANT_ALWAYS:
+          next_state = ACP_STATE_TRIGGERED;
+          [[fallthrough]];
+        case ALARM_SENSOR_TYPE_INSTANT:
+          instant_sensor_faulted = true;
+          break;
+        case ALARM_SENSOR_TYPE_DELAYED_FOLLOWER:
+          // Look to see if we are in the pending state
+          if (this->current_state_ == ACP_STATE_PENDING) {
+            delayed_sensor_faulted = true;
+          } else {
+            instant_sensor_faulted = true;
+          }
+          break;
+        case ALARM_SENSOR_TYPE_DELAYED:
+        default:
+          delayed_sensor_faulted = true;
       }
     }
   }
+  // Update all sensors ready flag
+  bool sensors_ready = !(instant_sensor_faulted || delayed_sensor_faulted);
+
+  // Call the ready state change callback if there was a change
+  if (this->sensors_ready_ != sensors_ready) {
+    this->sensors_ready_ = sensors_ready;
+    this->ready_callback_.call();
+  }
+
 #endif
-  if (trigger) {
-    if (this->pending_time_ > 0 && this->current_state_ != ACP_STATE_TRIGGERED) {
-      this->publish_state(ACP_STATE_PENDING);
-    } else {
+  if (this->is_state_armed(next_state) && (!this->sensors_ready_)) {
+    // Instant sensors
+    if (instant_sensor_faulted) {
       this->publish_state(ACP_STATE_TRIGGERED);
+    } else if (delayed_sensor_faulted) {
+      // Delayed sensors
+      if ((this->pending_time_ > 0) && (this->current_state_ != ACP_STATE_TRIGGERED)) {
+        this->publish_state(ACP_STATE_PENDING);
+      } else {
+        this->publish_state(ACP_STATE_TRIGGERED);
+      }
     }
-  } else if (future_state != this->current_state_) {
-    this->publish_state(future_state);
+  } else if (next_state != this->current_state_) {
+    this->publish_state(next_state);
   }
 }
 
@@ -146,8 +225,6 @@ uint32_t TemplateAlarmControlPanel::get_supported_features() const {
   return features;
 }
 
-bool TemplateAlarmControlPanel::get_requires_code() const { return !this->codes_.empty(); }
-
 void TemplateAlarmControlPanel::arm_(optional<std::string> code, alarm_control_panel::AlarmControlPanelState state,
                                      uint32_t delay) {
   if (this->current_state_ != ACP_STATE_DISARMED) {
@@ -162,8 +239,21 @@ void TemplateAlarmControlPanel::arm_(optional<std::string> code, alarm_control_p
   if (delay > 0) {
     this->publish_state(ACP_STATE_ARMING);
   } else {
+    this->bypass_before_arming();
     this->publish_state(state);
   }
+}
+
+void TemplateAlarmControlPanel::bypass_before_arming() {
+#ifdef USE_BINARY_SENSOR
+  for (const auto &alarm_sensor : this->sensors_) {
+    // Check for faulted bypass_auto sensors and remove them from monitoring
+    if ((alarm_sensor.info.flags & BINARY_SENSOR_MODE_BYPASS_AUTO) && (alarm_sensor.sensor->state)) {
+      ESP_LOGW(TAG, "'%s' is faulted and will be automatically bypassed", alarm_sensor.sensor->get_name().c_str());
+      this->bypassed_sensor_indicies_.push_back(alarm_sensor.info.store_index);
+    }
+  }
+#endif
 }
 
 void TemplateAlarmControlPanel::control(const AlarmControlPanelCall &call) {
@@ -181,6 +271,9 @@ void TemplateAlarmControlPanel::control(const AlarmControlPanelCall &call) {
       }
       this->desired_state_ = ACP_STATE_DISARMED;
       this->publish_state(ACP_STATE_DISARMED);
+#ifdef USE_BINARY_SENSOR
+      this->bypassed_sensor_indicies_.clear();
+#endif
     } else if (call.get_state() == ACP_STATE_TRIGGERED) {
       this->publish_state(ACP_STATE_TRIGGERED);
     } else if (call.get_state() == ACP_STATE_PENDING) {
@@ -192,5 +285,4 @@ void TemplateAlarmControlPanel::control(const AlarmControlPanelCall &call) {
   }
 }
 
-}  // namespace template_
-}  // namespace esphome
+}  // namespace esphome::template_

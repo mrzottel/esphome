@@ -1,6 +1,8 @@
-#include <utility>
-
 #include "alarm_control_panel.h"
+#include "esphome/core/defines.h"
+#include "esphome/core/controller_registry.h"
+
+#include <utility>
 
 #include "esphome/core/application.h"
 #include "esphome/core/helpers.h"
@@ -34,6 +36,9 @@ void AlarmControlPanel::publish_state(AlarmControlPanelState state) {
              LOG_STR_ARG(alarm_control_panel_state_to_string(prev_state)));
     this->current_state_ = state;
     this->state_callback_.call();
+#if defined(USE_ALARM_CONTROL_PANEL) && defined(USE_CONTROLLER_REGISTRY)
+    ControllerRegistry::notify_alarm_control_panel_update(this);
+#endif
     if (state == ACP_STATE_TRIGGERED) {
       this->triggered_callback_.call();
     } else if (state == ACP_STATE_ARMING) {
@@ -94,6 +99,14 @@ void AlarmControlPanel::add_on_disarmed_callback(std::function<void()> &&callbac
 
 void AlarmControlPanel::add_on_cleared_callback(std::function<void()> &&callback) {
   this->cleared_callback_.add(std::move(callback));
+}
+
+void AlarmControlPanel::add_on_chime_callback(std::function<void()> &&callback) {
+  this->chime_callback_.add(std::move(callback));
+}
+
+void AlarmControlPanel::add_on_ready_callback(std::function<void()> &&callback) {
+  this->ready_callback_.add(std::move(callback));
 }
 
 void AlarmControlPanel::arm_away(optional<std::string> code) {

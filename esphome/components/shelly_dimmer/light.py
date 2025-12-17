@@ -1,35 +1,36 @@
-from pathlib import Path
 import hashlib
+from pathlib import Path
 import re
+
 import requests
 
-
-import esphome.codegen as cg
-import esphome.config_validation as cv
 from esphome import pins
+import esphome.codegen as cg
 from esphome.components import light, sensor, uart
+import esphome.config_validation as cv
 from esphome.const import (
-    CONF_OUTPUT_ID,
-    CONF_GAMMA_CORRECT,
-    CONF_POWER,
-    CONF_VOLTAGE,
     CONF_CURRENT,
-    CONF_VERSION,
-    CONF_URL,
+    CONF_GAMMA_CORRECT,
+    CONF_MAX_BRIGHTNESS,
+    CONF_MIN_BRIGHTNESS,
+    CONF_OUTPUT_ID,
+    CONF_POWER,
     CONF_UPDATE_INTERVAL,
-    UNIT_VOLT,
-    UNIT_AMPERE,
-    UNIT_WATT,
+    CONF_URL,
+    CONF_VERSION,
+    CONF_VOLTAGE,
+    DEVICE_CLASS_CURRENT,
     DEVICE_CLASS_POWER,
     DEVICE_CLASS_VOLTAGE,
-    DEVICE_CLASS_CURRENT,
-    CONF_MIN_BRIGHTNESS,
-    CONF_MAX_BRIGHTNESS,
+    UNIT_AMPERE,
+    UNIT_VOLT,
+    UNIT_WATT,
 )
-from esphome.core import HexInt, CORE
+from esphome.core import CORE, HexInt
 
 DOMAIN = "shelly_dimmer"
-DEPENDENCIES = ["sensor", "uart", "esp8266"]
+AUTO_LOAD = ["sensor"]
+DEPENDENCIES = ["uart", "esp8266"]
 
 shelly_dimmer_ns = cg.esphome_ns.namespace("shelly_dimmer")
 ShellyDimmer = shelly_dimmer_ns.class_(
@@ -56,6 +57,10 @@ KNOWN_FIRMWARE = {
     "51.6": (
         "https://github.com/jamesturton/shelly-dimmer-stm32/releases/download/v51.6/shelly-dimmer-stm32_v51.6.bin",
         "eda483e111c914723a33f5088f1397d5c0b19333db4a88dc965636b976c16c36",
+    ),
+    "51.7": (
+        "https://github.com/jamesturton/shelly-dimmer-stm32/releases/download/v51.7/shelly-dimmer-stm32_v51.7.bin",
+        "7a20f1c967c469917368a79bc56498009045237080408cef7190743e08031889",
     ),
 }
 
@@ -87,12 +92,7 @@ def get_firmware(value):
     url = value[CONF_URL]
 
     if CONF_SHA256 in value:  # we have a hash, enable caching
-        path = (
-            Path(CORE.config_dir)
-            / ".esphome"
-            / DOMAIN
-            / (value[CONF_SHA256] + "_fw_stm.bin")
-        )
+        path = Path(CORE.data_dir) / DOMAIN / (value[CONF_SHA256] + "_fw_stm.bin")
 
         if not path.is_file():
             firmware_data, dl_hash = dl(url)
@@ -183,7 +183,7 @@ CONFIG_SCHEMA = (
 )
 
 
-def to_code(config):
+async def to_code(config):
     fw_hex = get_firmware(config[CONF_FIRMWARE])
     fw_major, fw_minor = parse_firmware_version(config[CONF_FIRMWARE][CONF_VERSION])
 
@@ -193,17 +193,17 @@ def to_code(config):
     cg.add_define("USE_SHD_FIRMWARE_MINOR_VERSION", fw_minor)
 
     var = cg.new_Pvariable(config[CONF_OUTPUT_ID])
-    yield cg.register_component(var, config)
+    await cg.register_component(var, config)
     config.pop(
         CONF_UPDATE_INTERVAL
     )  # drop UPDATE_INTERVAL as it does not apply to the light component
 
-    yield light.register_light(var, config)
-    yield uart.register_uart_device(var, config)
+    await light.register_light(var, config)
+    await uart.register_uart_device(var, config)
 
-    nrst_pin = yield cg.gpio_pin_expression(config[CONF_NRST_PIN])
+    nrst_pin = await cg.gpio_pin_expression(config[CONF_NRST_PIN])
     cg.add(var.set_nrst_pin(nrst_pin))
-    boot0_pin = yield cg.gpio_pin_expression(config[CONF_BOOT0_PIN])
+    boot0_pin = await cg.gpio_pin_expression(config[CONF_BOOT0_PIN])
     cg.add(var.set_boot0_pin(boot0_pin))
 
     cg.add(var.set_leading_edge(config[CONF_LEADING_EDGE]))
@@ -217,5 +217,5 @@ def to_code(config):
             continue
 
         conf = config[key]
-        sens = yield sensor.new_sensor(conf)
+        sens = await sensor.new_sensor(conf)
         cg.add(getattr(var, f"set_{key}_sensor")(sens))

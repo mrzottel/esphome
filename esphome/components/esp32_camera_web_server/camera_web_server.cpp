@@ -40,7 +40,7 @@ CameraWebServer::CameraWebServer() {}
 CameraWebServer::~CameraWebServer() {}
 
 void CameraWebServer::setup() {
-  if (!esp32_camera::global_esp32_camera || esp32_camera::global_esp32_camera->is_failed()) {
+  if (!camera::Camera::instance() || camera::Camera::instance()->is_failed()) {
     this->mark_failed();
     return;
   }
@@ -67,12 +67,14 @@ void CameraWebServer::setup() {
 
   httpd_register_uri_handler(this->httpd_, &uri);
 
-  esp32_camera::global_esp32_camera->add_image_callback([this](std::shared_ptr<esp32_camera::CameraImage> image) {
-    if (this->running_ && image->was_requested_by(esp32_camera::WEB_REQUESTER)) {
-      this->image_ = std::move(image);
-      xSemaphoreGive(this->semaphore_);
-    }
-  });
+  camera::Camera::instance()->add_listener(this);
+}
+
+void CameraWebServer::on_camera_image(const std::shared_ptr<camera::CameraImage> &image) {
+  if (this->running_ && image->was_requested_by(camera::WEB_REQUESTER)) {
+    this->image_ = image;
+    xSemaphoreGive(this->semaphore_);
+  }
 }
 
 void CameraWebServer::on_shutdown() {
@@ -85,8 +87,10 @@ void CameraWebServer::on_shutdown() {
 }
 
 void CameraWebServer::dump_config() {
-  ESP_LOGCONFIG(TAG, "ESP32 Camera Web Server:");
-  ESP_LOGCONFIG(TAG, "  Port: %d", this->port_);
+  ESP_LOGCONFIG(TAG,
+                "ESP32 Camera Web Server:\n"
+                "  Port: %d",
+                this->port_);
   if (this->mode_ == STREAM) {
     ESP_LOGCONFIG(TAG, "  Mode: stream");
   } else {
@@ -106,8 +110,8 @@ void CameraWebServer::loop() {
   }
 }
 
-std::shared_ptr<esphome::esp32_camera::CameraImage> CameraWebServer::wait_for_image_() {
-  std::shared_ptr<esphome::esp32_camera::CameraImage> image;
+std::shared_ptr<esphome::camera::CameraImage> CameraWebServer::wait_for_image_() {
+  std::shared_ptr<esphome::camera::CameraImage> image;
   image.swap(this->image_);
 
   if (!image) {
@@ -170,7 +174,7 @@ esp_err_t CameraWebServer::streaming_handler_(struct httpd_req *req) {
   uint32_t last_frame = millis();
   uint32_t frames = 0;
 
-  esp32_camera::global_esp32_camera->start_stream(esphome::esp32_camera::WEB_REQUESTER);
+  camera::Camera::instance()->start_stream(esphome::camera::WEB_REQUESTER);
 
   while (res == ESP_OK && this->running_) {
     auto image = this->wait_for_image_();
@@ -194,8 +198,8 @@ esp_err_t CameraWebServer::streaming_handler_(struct httpd_req *req) {
       int64_t frame_time = millis() - last_frame;
       last_frame = millis();
 
-      ESP_LOGD(TAG, "MJPG: %uB %ums (%.1ffps)", (uint32_t) image->get_data_length(), (uint32_t) frame_time,
-               1000.0 / (uint32_t) frame_time);
+      ESP_LOGD(TAG, "MJPG: %" PRIu32 "B %" PRIu32 "ms (%.1ffps)", (uint32_t) image->get_data_length(),
+               (uint32_t) frame_time, 1000.0 / (uint32_t) frame_time);
     }
   }
 
@@ -203,9 +207,9 @@ esp_err_t CameraWebServer::streaming_handler_(struct httpd_req *req) {
     res = httpd_send_all(req, STREAM_ERROR, strlen(STREAM_ERROR));
   }
 
-  esp32_camera::global_esp32_camera->stop_stream(esphome::esp32_camera::WEB_REQUESTER);
+  camera::Camera::instance()->stop_stream(esphome::camera::WEB_REQUESTER);
 
-  ESP_LOGI(TAG, "STREAM: closed. Frames: %u", frames);
+  ESP_LOGI(TAG, "STREAM: closed. Frames: %" PRIu32, frames);
 
   return res;
 }
@@ -213,7 +217,7 @@ esp_err_t CameraWebServer::streaming_handler_(struct httpd_req *req) {
 esp_err_t CameraWebServer::snapshot_handler_(struct httpd_req *req) {
   esp_err_t res = ESP_OK;
 
-  esp32_camera::global_esp32_camera->request_image(esphome::esp32_camera::WEB_REQUESTER);
+  camera::Camera::instance()->request_image(esphome::camera::WEB_REQUESTER);
 
   auto image = this->wait_for_image_();
 

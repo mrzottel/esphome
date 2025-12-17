@@ -7,7 +7,6 @@ namespace canbus {
 static const char *const TAG = "canbus";
 
 void Canbus::setup() {
-  ESP_LOGCONFIG(TAG, "Setting up Canbus...");
   if (!this->setup_internal()) {
     ESP_LOGE(TAG, "setup error!");
     this->mark_failed();
@@ -16,21 +15,23 @@ void Canbus::setup() {
 
 void Canbus::dump_config() {
   if (this->use_extended_id_) {
-    ESP_LOGCONFIG(TAG, "config extended id=0x%08x", this->can_id_);
+    ESP_LOGCONFIG(TAG, "config extended id=0x%08" PRIx32, this->can_id_);
   } else {
-    ESP_LOGCONFIG(TAG, "config standard id=0x%03x", this->can_id_);
+    ESP_LOGCONFIG(TAG, "config standard id=0x%03" PRIx32, this->can_id_);
   }
 }
 
-void Canbus::send_data(uint32_t can_id, bool use_extended_id, bool remote_transmission_request,
-                       const std::vector<uint8_t> &data) {
+canbus::Error Canbus::send_data(uint32_t can_id, bool use_extended_id, bool remote_transmission_request,
+                                const std::vector<uint8_t> &data) {
   struct CanFrame can_message;
 
   uint8_t size = static_cast<uint8_t>(data.size());
   if (use_extended_id) {
-    ESP_LOGD(TAG, "send extended id=0x%08x rtr=%s size=%d", can_id, TRUEFALSE(remote_transmission_request), size);
+    ESP_LOGD(TAG, "send extended id=0x%08" PRIx32 " rtr=%s size=%d", can_id, TRUEFALSE(remote_transmission_request),
+             size);
   } else {
-    ESP_LOGD(TAG, "send standard id=0x%03x rtr=%s size=%d", can_id, TRUEFALSE(remote_transmission_request), size);
+    ESP_LOGD(TAG, "send standard id=0x%03" PRIx32 " rtr=%s size=%d", can_id, TRUEFALSE(remote_transmission_request),
+             size);
   }
   if (size > CAN_MAX_DATA_LENGTH)
     size = CAN_MAX_DATA_LENGTH;
@@ -44,14 +45,22 @@ void Canbus::send_data(uint32_t can_id, bool use_extended_id, bool remote_transm
     ESP_LOGVV(TAG, "  data[%d]=%02x", i, can_message.data[i]);
   }
 
-  this->send_message(&can_message);
+  canbus::Error error = this->send_message(&can_message);
+  if (error != canbus::ERROR_OK) {
+    if (use_extended_id) {
+      ESP_LOGW(TAG, "send to extended id=0x%08" PRIx32 " failed with error %d!", can_id, error);
+    } else {
+      ESP_LOGW(TAG, "send to standard id=0x%03" PRIx32 " failed with error %d!", can_id, error);
+    }
+  }
+  return error;
 }
 
 void Canbus::add_trigger(CanbusTrigger *trigger) {
   if (trigger->use_extended_id_) {
-    ESP_LOGVV(TAG, "add trigger for extended canid=0x%08x", trigger->can_id_);
+    ESP_LOGVV(TAG, "add trigger for extended canid=0x%08" PRIx32, trigger->can_id_);
   } else {
-    ESP_LOGVV(TAG, "add trigger for std canid=0x%03x", trigger->can_id_);
+    ESP_LOGVV(TAG, "add trigger for std canid=0x%03" PRIx32, trigger->can_id_);
   }
   this->triggers_.push_back(trigger);
 };
@@ -63,10 +72,10 @@ void Canbus::loop() {
   while (this->read_message(&can_message) == canbus::ERROR_OK) {
     message_counter++;
     if (can_message.use_extended_id) {
-      ESP_LOGD(TAG, "received can message (#%d) extended can_id=0x%x size=%d", message_counter, can_message.can_id,
-               can_message.can_data_length_code);
+      ESP_LOGD(TAG, "received can message (#%d) extended can_id=0x%" PRIx32 " size=%d", message_counter,
+               can_message.can_id, can_message.can_data_length_code);
     } else {
-      ESP_LOGD(TAG, "received can message (#%d) std can_id=0x%x size=%d", message_counter, can_message.can_id,
+      ESP_LOGD(TAG, "received can message (#%d) std can_id=0x%" PRIx32 " size=%d", message_counter, can_message.can_id,
                can_message.can_data_length_code);
     }
 
@@ -77,6 +86,9 @@ void Canbus::loop() {
       ESP_LOGV(TAG, "  can_message.data[%d]=%02x", i, can_message.data[i]);
       data.push_back(can_message.data[i]);
     }
+
+    this->callback_manager_(can_message.can_id, can_message.use_extended_id, can_message.remote_transmission_request,
+                            data);
 
     // fire all triggers
     for (auto *trigger : this->triggers_) {

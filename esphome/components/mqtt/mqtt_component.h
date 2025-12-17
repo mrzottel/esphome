@@ -8,6 +8,7 @@
 
 #include "esphome/core/component.h"
 #include "esphome/core/entity_base.h"
+#include "esphome/core/string_ref.h"
 #include "mqtt_client.h"
 
 namespace esphome {
@@ -76,6 +77,10 @@ class MQTTComponent : public Component {
 
   virtual bool is_internal();
 
+  /// Set QOS for state messages.
+  void set_qos(uint8_t qos);
+  uint8_t get_qos() const;
+
   /// Set whether state message should be retained.
   void set_retain(bool retain);
   bool get_retain() const;
@@ -84,13 +89,16 @@ class MQTTComponent : public Component {
   void disable_discovery();
   bool is_discovery_enabled() const;
 
+  /// Set the QOS for subscribe messages (used in discovery).
+  void set_subscribe_qos(uint8_t qos);
+
   /// Override this method to return the component type (e.g. "light", "sensor", ...)
   virtual std::string component_type() const = 0;
 
   /// Set a custom state topic. Set to "" for default behavior.
-  void set_custom_state_topic(const std::string &custom_state_topic);
+  void set_custom_state_topic(const char *custom_state_topic);
   /// Set a custom command topic. Set to "" for default behavior.
-  void set_custom_command_topic(const std::string &custom_command_topic);
+  void set_custom_command_topic(const char *custom_command_topic);
   /// Set whether command message should be retained.
   void set_command_retain(bool command_retain);
 
@@ -156,21 +164,14 @@ class MQTTComponent : public Component {
    */
   virtual const EntityBase *get_entity() const = 0;
 
-  /** A unique ID for this MQTT component, empty for no unique id. See unique ID requirements:
-   * https://developers.home-assistant.io/docs/en/entity_registry_index.html#unique-id-requirements
-   *
-   * @return The unique id as a string.
-   */
-  virtual std::string unique_id();
-
   /// Get the friendly name of this MQTT component.
-  virtual std::string friendly_name() const;
+  std::string friendly_name_() const;
 
-  /// Get the icon field of this component
-  virtual std::string get_icon() const;
+  /// Get the icon field of this component as StringRef
+  StringRef get_icon_ref_() const;
 
   /// Get whether the underlying Entity is disabled by default
-  virtual bool is_disabled_by_default() const;
+  bool is_disabled_by_default_() const;
 
   /// Get the MQTT topic that new states will be shared to.
   std::string get_state_topic_() const;
@@ -188,12 +189,19 @@ class MQTTComponent : public Component {
   /// Generate the Home Assistant MQTT discovery object id by automatically transforming the friendly name.
   std::string get_default_object_id_() const;
 
-  std::string custom_state_topic_{};
-  std::string custom_command_topic_{};
+  StringRef custom_state_topic_{};
+  StringRef custom_command_topic_{};
+
+  std::unique_ptr<Availability> availability_;
+
+  bool has_custom_state_topic_{false};
+  bool has_custom_command_topic_{false};
+
   bool command_retain_{false};
   bool retain_{true};
+  uint8_t qos_{0};
+  uint8_t subscribe_qos_{0};
   bool discovery_enabled_{true};
-  std::unique_ptr<Availability> availability_;
   bool resend_state_{false};
 };
 

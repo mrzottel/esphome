@@ -1,7 +1,6 @@
 import hashlib
 
-from esphome import config_validation as cv, automation
-from esphome import codegen as cg
+from esphome import automation, codegen as cg, config_validation as cv
 from esphome.const import (
     CONF_ID,
     CONF_INITIAL_VALUE,
@@ -9,13 +8,19 @@ from esphome.const import (
     CONF_TYPE,
     CONF_VALUE,
 )
-from esphome.core import coroutine_with_priority
+from esphome.core import CoroPriority, coroutine_with_priority
 
 CODEOWNERS = ["@esphome/core"]
 globals_ns = cg.esphome_ns.namespace("globals")
 GlobalsComponent = globals_ns.class_("GlobalsComponent", cg.Component)
 RestoringGlobalsComponent = globals_ns.class_("RestoringGlobalsComponent", cg.Component)
+RestoringGlobalStringComponent = globals_ns.class_(
+    "RestoringGlobalStringComponent", cg.Component
+)
 GlobalVarSetAction = globals_ns.class_("GlobalVarSetAction", automation.Action)
+
+CONF_MAX_RESTORE_DATA_LENGTH = "max_restore_data_length"
+
 
 MULTI_CONF = True
 CONFIG_SCHEMA = cv.Schema(
@@ -24,20 +29,28 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Required(CONF_TYPE): cv.string_strict,
         cv.Optional(CONF_INITIAL_VALUE): cv.string_strict,
         cv.Optional(CONF_RESTORE_VALUE, default=False): cv.boolean,
+        cv.Optional(CONF_MAX_RESTORE_DATA_LENGTH): cv.int_range(0, 254),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
 
 # Run with low priority so that namespaces are registered first
-@coroutine_with_priority(-100.0)
+@coroutine_with_priority(CoroPriority.LATE)
 async def to_code(config):
     type_ = cg.RawExpression(config[CONF_TYPE])
-    template_args = cg.TemplateArguments(type_)
     restore = config[CONF_RESTORE_VALUE]
 
-    type = RestoringGlobalsComponent if restore else GlobalsComponent
-    res_type = type.template(template_args)
+    # Special casing the strings to their own class with a different save/restore mechanism
+    if str(type_) == "std::string" and restore:
+        template_args = cg.TemplateArguments(
+            type_, config.get(CONF_MAX_RESTORE_DATA_LENGTH, 63) + 1
+        )
+        type = RestoringGlobalStringComponent
+    else:
+        template_args = cg.TemplateArguments(type_)
+        type = RestoringGlobalsComponent if restore else GlobalsComponent
 
+    res_type = type.template(template_args)
     initial_value = None
     if CONF_INITIAL_VALUE in config:
         initial_value = cg.RawExpression(config[CONF_INITIAL_VALUE])

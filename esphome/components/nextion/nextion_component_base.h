@@ -25,6 +25,9 @@ class NextionQueue {
   virtual ~NextionQueue() = default;
   NextionComponentBase *component;
   uint32_t queue_time = 0;
+
+  // Store command for retry if spacing blocked it
+  std::string pending_command;  // Empty if command was sent successfully
 };
 
 class NextionComponentBase {
@@ -69,6 +72,13 @@ class NextionComponentBase {
 
   std::vector<uint8_t> get_wave_buffer() { return this->wave_buffer_; }
   size_t get_wave_buffer_size() { return this->wave_buffer_.size(); }
+  void clear_wave_buffer(size_t buffer_sent) {
+    if (this->wave_buffer_.size() <= buffer_sent) {
+      this->wave_buffer_.clear();
+    } else {
+      this->wave_buffer_.erase(this->wave_buffer_.begin(), this->wave_buffer_.begin() + buffer_sent);
+    }
+  }
 
   std::string get_variable_name() { return this->variable_name_; }
   std::string get_variable_name_to_send() { return this->variable_name_to_send_; }

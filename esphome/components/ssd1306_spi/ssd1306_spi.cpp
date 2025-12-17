@@ -8,7 +8,6 @@ namespace ssd1306_spi {
 static const char *const TAG = "ssd1306_spi";
 
 void SPISSD1306::setup() {
-  ESP_LOGCONFIG(TAG, "Setting up SPI SSD1306...");
   this->spi_setup();
   this->dc_pin_->setup();  // OUTPUT
 
@@ -21,12 +20,15 @@ void SPISSD1306::dump_config() {
   LOG_PIN("  CS Pin: ", this->cs_);
   LOG_PIN("  DC Pin: ", this->dc_pin_);
   LOG_PIN("  Reset Pin: ", this->reset_pin_);
-  ESP_LOGCONFIG(TAG, "  External VCC: %s", YESNO(this->external_vcc_));
-  ESP_LOGCONFIG(TAG, "  Flip X: %s", YESNO(this->flip_x_));
-  ESP_LOGCONFIG(TAG, "  Flip Y: %s", YESNO(this->flip_y_));
-  ESP_LOGCONFIG(TAG, "  Offset X: %d", this->offset_x_);
-  ESP_LOGCONFIG(TAG, "  Offset Y: %d", this->offset_y_);
-  ESP_LOGCONFIG(TAG, "  Inverted Color: %s", YESNO(this->invert_));
+  ESP_LOGCONFIG(TAG,
+                "  External VCC: %s\n"
+                "  Flip X: %s\n"
+                "  Flip Y: %s\n"
+                "  Offset X: %d\n"
+                "  Offset Y: %d\n"
+                "  Inverted Color: %s",
+                YESNO(this->external_vcc_), YESNO(this->flip_x_), YESNO(this->flip_y_), this->offset_x_,
+                this->offset_y_, YESNO(this->invert_));
   LOG_UPDATE_INTERVAL(this);
 }
 void SPISSD1306::command(uint8_t value) {
@@ -36,10 +38,14 @@ void SPISSD1306::command(uint8_t value) {
   this->disable();
 }
 void HOT SPISSD1306::write_display_data() {
-  if (this->is_sh1106_()) {
+  if (this->is_sh1106_() || this->is_sh1107_()) {
     for (uint8_t y = 0; y < (uint8_t) this->get_height_internal() / 8; y++) {
       this->command(0xB0 + y);
-      this->command(0x02);
+      if (this->is_sh1106_()) {
+        this->command(0x02);
+      } else {
+        this->command(0x00);
+      }
       this->command(0x10);
       this->dc_pin_->digital_write(true);
       for (uint8_t x = 0; x < (uint8_t) this->get_width_internal(); x++) {

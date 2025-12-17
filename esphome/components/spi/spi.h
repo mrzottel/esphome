@@ -1,13 +1,20 @@
 #pragma once
-
+#ifndef USE_ZEPHYR
+#include "esphome/core/application.h"
 #include "esphome/core/component.h"
 #include "esphome/core/hal.h"
 #include "esphome/core/log.h"
-#include "esphome/core/application.h"
-#include <vector>
 #include <map>
+#include <utility>
+#include <vector>
 
-#ifdef USE_ARDUINO
+#ifdef USE_ESP32
+
+#include "driver/spi_master.h"
+
+using SPIInterface = spi_host_device_t;
+
+#elif defined(USE_ARDUINO)
 
 #include <SPI.h>
 
@@ -17,21 +24,12 @@ using SPIInterface = SPIClassRP2040 *;
 using SPIInterface = SPIClass *;
 #endif
 
-#endif
-
-#ifdef USE_ESP_IDF
-
-#include "driver/spi_master.h"
-
-using SPIInterface = spi_host_device_t;
-
-#endif  // USE_ESP_IDF
+#endif  // USE_ESP32 / USE_ARDUINO
 
 /**
  * Implementation of SPI Controller mode.
  */
-namespace esphome {
-namespace spi {
+namespace esphome::spi {
 
 /// The bit-order for SPI devices. This defines how the data read from and written to the device is interpreted.
 enum SPIBitOrder {
@@ -112,6 +110,8 @@ class NullPin : public GPIOPin {
   void setup() override {}
 
   void pin_mode(gpio::Flags flags) override {}
+
+  gpio::Flags get_flags() const override { return gpio::Flags::FLAG_NONE; }
 
   bool digital_read() override { return false; }
 
@@ -199,6 +199,19 @@ class SPIDelegate {
       rxbuf[i] = this->transfer(txbuf[i]);
   }
 
+  /**
+   * write a variable length data item, up to 16 bits.
+   * @param data The data to send. Should be LSB-aligned (i.e. top bits will be discarded.)
+   * @param num_bits The number of bits to send
+   */
+  virtual void write(uint16_t data, size_t num_bits) {
+    esph_log_e("spi_device", "variable length write not implemented");
+  }
+
+  virtual void write_cmd_addr_data(size_t cmd_bits, uint32_t cmd, size_t addr_bits, uint32_t address,
+                                   const uint8_t *data, size_t length, uint8_t bus_width) {
+    esph_log_e("spi_device", "write_cmd_addr_data not implemented");
+  }
   // write 16 bits
   virtual void write16(uint16_t data) {
     if (this->bit_order_ == BIT_ORDER_MSB_FIRST) {
@@ -248,6 +261,7 @@ class SPIDelegateDummy : public SPIDelegate {
   SPIDelegateDummy() = default;
 
   uint8_t transfer(uint8_t data) override { return 0; }
+  void end_transaction() override{};
 
   void begin_transaction() override;
 };
@@ -269,6 +283,10 @@ class SPIDelegateBitBash : public SPIDelegate {
 
   uint8_t transfer(uint8_t data) override;
 
+  void write(uint16_t data, size_t num_bits) override;
+
+  void write16(uint16_t data) override { this->write(data, 16); };
+
  protected:
   GPIOPin *clk_pin_;
   GPIOPin *sdo_pin_;
@@ -283,6 +301,7 @@ class SPIDelegateBitBash : public SPIDelegate {
       continue;
     this->last_transition_ += this->wait_cycle_;
   }
+  uint16_t transfer_(uint16_t data, size_t num_bits);
 };
 
 class SPIBus {
@@ -291,7 +310,8 @@ class SPIBus {
 
   SPIBus(GPIOPin *clk, GPIOPin *sdo, GPIOPin *sdi) : clk_pin_(clk), sdo_pin_(sdo), sdi_pin_(sdi) {}
 
-  virtual SPIDelegate *get_delegate(uint32_t data_rate, SPIBitOrder bit_order, SPIMode mode, GPIOPin *cs_pin) {
+  virtual SPIDelegate *get_delegate(uint32_t data_rate, SPIBitOrder bit_order, SPIMode mode, GPIOPin *cs_pin,
+                                    bool release_device, bool write_only) {
     return new SPIDelegateBitBash(data_rate, bit_order, mode, cs_pin, this->clk_pin_, this->sdo_pin_, this->sdi_pin_);
   }
 
@@ -308,7 +328,7 @@ class SPIClient;
 class SPIComponent : public Component {
  public:
   SPIDelegate *register_device(SPIClient *device, SPIMode mode, SPIBitOrder bit_order, uint32_t data_rate,
-                               GPIOPin *cs_pin);
+                               GPIOPin *cs_pin, bool release_device, bool write_only);
   void unregister_device(SPIClient *device);
 
   void set_clk(GPIOPin *clk) { this->clk_pin_ = clk; }
@@ -316,6 +336,7 @@ class SPIComponent : public Component {
   void set_miso(GPIOPin *sdi) { this->sdi_pin_ = sdi; }
 
   void set_mosi(GPIOPin *sdo) { this->sdo_pin_ = sdo; }
+  void set_data_pins(std::vector<uint8_t> pins) { this->data_pins_ = std::move(pins); }
 
   void set_interface(SPIInterface interface) {
     this->interface_ = interface;
@@ -328,20 +349,31 @@ class SPIComponent : public Component {
 
   void setup() override;
   void dump_config() override;
+  size_t get_bus_width() const {
+    if (this->data_pins_.empty()) {
+      return 1;
+    }
+    return this->data_pins_.size();
+  }
 
  protected:
   GPIOPin *clk_pin_{nullptr};
   GPIOPin *sdi_pin_{nullptr};
   GPIOPin *sdo_pin_{nullptr};
+  std::vector<uint8_t> data_pins_{};
+
   SPIInterface interface_{};
   bool using_hw_{false};
   const char *interface_name_{nullptr};
   SPIBus *spi_bus_{};
   std::map<SPIClient *, SPIDelegate *> devices_;
 
-  static SPIBus *get_bus(SPIInterface interface, GPIOPin *clk, GPIOPin *sdo, GPIOPin *sdi);
+  static SPIBus *get_bus(SPIInterface interface, GPIOPin *clk, GPIOPin *sdo, GPIOPin *sdi,
+                         const std::vector<uint8_t> &data_pins);
 };
 
+using QuadSPIComponent = SPIComponent;
+using OctalSPIComponent = SPIComponent;
 /**
  * Base class for SPIDevice, un-templated.
  */
@@ -351,7 +383,9 @@ class SPIClient {
       : bit_order_(bit_order), mode_(mode), data_rate_(data_rate) {}
 
   virtual void spi_setup() {
-    this->delegate_ = this->parent_->register_device(this, this->mode_, this->bit_order_, this->data_rate_, this->cs_);
+    esph_log_d("spi_device", "mode %u, data_rate %ukHz", (unsigned) this->mode_, (unsigned) (this->data_rate_ / 1000));
+    this->delegate_ = this->parent_->register_device(this, this->mode_, this->bit_order_, this->data_rate_, this->cs_,
+                                                     this->release_device_, this->write_only_);
   }
 
   virtual void spi_teardown() {
@@ -360,6 +394,8 @@ class SPIClient {
   }
 
   bool spi_is_ready() { return this->delegate_->is_ready(); }
+  void set_release_device(bool release) { this->release_device_ = release; }
+  void set_write_only(bool write_only) { this->write_only_ = write_only; }
 
  protected:
   SPIBitOrder bit_order_{BIT_ORDER_MSB_FIRST};
@@ -367,6 +403,8 @@ class SPIClient {
   uint32_t data_rate_{1000000};
   SPIComponent *parent_{nullptr};
   GPIOPin *cs_{nullptr};
+  bool release_device_{false};
+  bool write_only_{false};
   SPIDelegate *delegate_{SPIDelegate::NULL_DELEGATE};
 };
 
@@ -398,10 +436,7 @@ class SPIDevice : public SPIClient {
 
   void set_data_rate(uint32_t data_rate) { this->data_rate_ = data_rate; }
 
-  void set_bit_order(SPIBitOrder order) {
-    this->bit_order_ = order;
-    esph_log_d("spi.h", "bit order set to %d", order);
-  }
+  void set_bit_order(SPIBitOrder order) { this->bit_order_ = order; }
 
   void set_mode(SPIMode mode) { this->mode_ = mode; }
 
@@ -409,16 +444,49 @@ class SPIDevice : public SPIClient {
 
   void read_array(uint8_t *data, size_t length) { return this->delegate_->read_array(data, length); }
 
+  /**
+   * Write a single data item, up to 32 bits.
+   * @param data    The data
+   * @param num_bits The number of bits to write. The lower num_bits of data will be sent.
+   */
+  void write(uint16_t data, size_t num_bits) { this->delegate_->write(data, num_bits); };
+
+  /* Write command, address and data. Command and address will be written as single-bit SPI,
+   * data phase can be multiple bit (currently only 1 or 4)
+   * @param cmd_bits Number of bits to write in the command phase
+   * @param cmd The command value to write
+   * @param addr_bits Number of bits to write in addr phase
+   * @param address Address data
+   * @param data Plain data bytes
+   * @param length Number of data bytes
+   * @param bus_width The number of data lines to use for the data phase.
+   */
+  void write_cmd_addr_data(size_t cmd_bits, uint32_t cmd, size_t addr_bits, uint32_t address, const uint8_t *data,
+                           size_t length, uint8_t bus_width = 1) {
+    this->delegate_->write_cmd_addr_data(cmd_bits, cmd, addr_bits, address, data, length, bus_width);
+  }
+
   void write_byte(uint8_t data) { this->delegate_->write_array(&data, 1); }
 
+  /**
+   * Write the array data, replace with received data.
+   * @param data
+   * @param length
+   */
   void transfer_array(uint8_t *data, size_t length) { this->delegate_->transfer(data, length); }
 
   uint8_t transfer_byte(uint8_t data) { return this->delegate_->transfer(data); }
 
-  // the driver will byte-swap if required.
+  /** Write 16 bit data. The driver will byte-swap if required.
+   */
   void write_byte16(uint16_t data) { this->delegate_->write16(data); }
 
-  // avoid use of this if possible. It's inefficient and ugly.
+  /**
+   * Write an array of data as 16 bit values, byte-swapping if required. Use of this should be avoided as
+   * it is horribly slow.
+   * @param data
+   * @param length
+   */
   void write_array16(const uint16_t *data, size_t length) { this->delegate_->write_array16(data, length); }
 
   void enable() { this->delegate_->begin_transaction(); }
@@ -434,5 +502,5 @@ class SPIDevice : public SPIClient {
   template<size_t N> void transfer_array(std::array<uint8_t, N> &data) { this->transfer_array(data.data(), N); }
 };
 
-}  // namespace spi
-}  // namespace esphome
+}  // namespace esphome::spi
+#endif  // USE_ZEPHYR

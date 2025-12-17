@@ -1,16 +1,17 @@
-import esphome.codegen as cg
-import esphome.config_validation as cv
 from esphome import pins
-from esphome.components import spi
-from esphome.components import display
+import esphome.codegen as cg
+from esphome.components import display, spi
+import esphome.config_validation as cv
 from esphome.const import (
     CONF_DC_PIN,
     CONF_ID,
+    CONF_INVERT_COLORS,
     CONF_LAMBDA,
     CONF_MODEL,
-    CONF_RESET_PIN,
     CONF_PAGES,
+    CONF_RESET_PIN,
 )
+
 from . import st7735_ns
 
 CODEOWNERS = ["@SenexCrenshaw"]
@@ -23,7 +24,6 @@ CONF_ROW_START = "row_start"
 CONF_COL_START = "col_start"
 CONF_EIGHT_BIT_COLOR = "eight_bit_color"
 CONF_USE_BGR = "use_bgr"
-CONF_INVERT_COLORS = "invert_colors"
 
 SPIST7735 = st7735_ns.class_(
     "ST7735", cg.PollingComponent, display.DisplayBuffer, spi.SPIDevice
@@ -68,8 +68,12 @@ CONFIG_SCHEMA = cv.All(
 )
 
 
+FINAL_VALIDATE_SCHEMA = spi.final_validate_device_schema(
+    "st7735", require_miso=False, require_mosi=True
+)
+
+
 async def setup_st7735(var, config):
-    await cg.register_component(var, config)
     await display.register_display(var, config)
 
     if CONF_RESET_PIN in config:

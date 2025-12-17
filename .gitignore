@@ -13,6 +13,12 @@ __pycache__/
 # Intellij Idea
 .idea
 
+# Eclipse
+.project
+.cproject
+.pydevproject
+.settings/
+
 # Vim
 *.swp
 
@@ -68,6 +74,9 @@ cov.xml
 
 # pyenv
 .python-version
+
+# asdf
+.tool-versions
 
 # Environments
 .env
@@ -132,3 +141,6 @@ sdkconfig.*
 .tests/
 
 /components
+/managed_components
+
+api-docs/

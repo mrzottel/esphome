@@ -1,9 +1,9 @@
 #pragma once
 
 #include "esphome/components/i2c/i2c.h"
+#include "esphome/core/automation.h"
 #include "esphome/core/component.h"
 #include "esphome/core/hal.h"
-#include "esphome/core/automation.h"
 //#include "esphome/core/helpers.h"
 
 /*
@@ -84,8 +84,7 @@ class GroveMotorDriveTB6612FNG : public Component, public i2c::I2CDevice {
   *************************************************************/
   void set_i2c_addr(uint8_t addr);
 
-  /*************************************************************
-      Description
+  /***********************************change_address
        Drive a motor.
       Parameter
        chl: MOTOR_CHA or MOTOR_CHB
@@ -169,7 +168,7 @@ class GROVETB6612FNGMotorRunAction : public Action<Ts...>, public Parented<Grove
   TEMPLATABLE_VALUE(uint8_t, channel)
   TEMPLATABLE_VALUE(uint16_t, speed)
 
-  void play(Ts... x) override {
+  void play(const Ts &...x) override {
     auto channel = this->channel_.value(x...);
     auto speed = this->speed_.value(x...);
     this->parent_->dc_motor_run(channel, speed);
@@ -181,7 +180,7 @@ class GROVETB6612FNGMotorBrakeAction : public Action<Ts...>, public Parented<Gro
  public:
   TEMPLATABLE_VALUE(uint8_t, channel)
 
-  void play(Ts... x) override { this->parent_->dc_motor_brake(this->channel_.value(x...)); }
+  void play(const Ts &...x) override { this->parent_->dc_motor_brake(this->channel_.value(x...)); }
 };
 
 template<typename... Ts>
@@ -189,19 +188,27 @@ class GROVETB6612FNGMotorStopAction : public Action<Ts...>, public Parented<Grov
  public:
   TEMPLATABLE_VALUE(uint8_t, channel)
 
-  void play(Ts... x) override { this->parent_->dc_motor_stop(this->channel_.value(x...)); }
+  void play(const Ts &...x) override { this->parent_->dc_motor_stop(this->channel_.value(x...)); }
 };
 
 template<typename... Ts>
 class GROVETB6612FNGMotorStandbyAction : public Action<Ts...>, public Parented<GroveMotorDriveTB6612FNG> {
  public:
-  void play(Ts... x) override { this->parent_->standby(); }
+  void play(const Ts &...x) override { this->parent_->standby(); }
 };
 
 template<typename... Ts>
 class GROVETB6612FNGMotorNoStandbyAction : public Action<Ts...>, public Parented<GroveMotorDriveTB6612FNG> {
  public:
-  void play(Ts... x) override { this->parent_->not_standby(); }
+  void play(const Ts &...x) override { this->parent_->not_standby(); }
+};
+
+template<typename... Ts>
+class GROVETB6612FNGMotorChangeAddressAction : public Action<Ts...>, public Parented<GroveMotorDriveTB6612FNG> {
+ public:
+  TEMPLATABLE_VALUE(uint8_t, address)
+
+  void play(const Ts &...x) override { this->parent_->set_i2c_addr(this->address_.value(x...)); }
 };
 
 }  // namespace grove_tb6612fng

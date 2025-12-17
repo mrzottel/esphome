@@ -116,6 +116,8 @@ class GraphTrace {
   void set_line_type(enum LineType val) { this->line_type_ = val; }
   Color get_line_color() { return this->line_color_; }
   void set_line_color(Color val) { this->line_color_ = val; }
+  bool get_continuous() { return this->continuous_; }
+  void set_continuous(bool continuous) { this->continuous_ = continuous; }
   std::string get_name() { return name_; }
   const HistoryData *get_tracedata() { return &data_; }
 
@@ -125,6 +127,7 @@ class GraphTrace {
   uint8_t line_thickness_{3};
   enum LineType line_type_ { LINE_TYPE_SOLID };
   Color line_color_{COLOR_ON};
+  bool continuous_{false};
   HistoryData data_;
 
   friend Graph;
@@ -158,11 +161,15 @@ class Graph : public Component {
   uint32_t get_duration() { return duration_; }
   uint32_t get_width() { return width_; }
   uint32_t get_height() { return height_; }
+  float get_graph_limit_min() { return graph_limit_min_; }
+  float get_graph_limit_max() { return graph_limit_max_; }
 
  protected:
   uint32_t duration_;  /// in seconds
   uint32_t width_;     /// in pixels
   uint32_t height_;    /// in pixels
+  float graph_limit_min_{NAN};
+  float graph_limit_max_{NAN};
   float min_value_{NAN};
   float max_value_{NAN};
   float min_range_{1.0};

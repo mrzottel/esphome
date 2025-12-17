@@ -3,6 +3,7 @@
 #include "bedjet_hub.h"
 #include "bedjet_child.h"
 #include "bedjet_const.h"
+#include "esphome/core/application.h"
 #include <cinttypes>
 
 namespace esphome {
@@ -242,7 +243,7 @@ void BedJetHub::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t ga
         this->set_notify_(true);
 
 #ifdef USE_TIME
-        if (this->time_id_.has_value()) {
+        if (this->time_id_ != nullptr) {
           this->send_local_time();
         }
 #endif
@@ -441,9 +442,8 @@ uint8_t BedJetHub::write_notify_config_descriptor_(bool enable) {
 
 #ifdef USE_TIME
 void BedJetHub::send_local_time() {
-  if (this->time_id_.has_value()) {
-    auto *time_id = *this->time_id_;
-    ESPTime now = time_id->now();
+  if (this->time_id_ != nullptr) {
+    ESPTime now = this->time_id_->now();
     if (now.is_valid()) {
       this->set_clock(now.hour, now.minute);
       ESP_LOGD(TAG, "Using time component to set BedJet clock: %d:%02d", now.hour, now.minute);
@@ -454,10 +454,9 @@ void BedJetHub::send_local_time() {
 }
 
 void BedJetHub::setup_time_() {
-  if (this->time_id_.has_value()) {
+  if (this->time_id_ != nullptr) {
     this->send_local_time();
-    auto *time_id = *this->time_id_;
-    time_id->add_on_time_sync_callback([this] { this->send_local_time(); });
+    this->time_id_->add_on_time_sync_callback([this] { this->send_local_time(); });
   } else {
     ESP_LOGI(TAG, "`time_id` is not configured: will not sync BedJet clock.");
   }
@@ -481,14 +480,20 @@ void BedJetHub::set_clock(uint8_t hour, uint8_t minute) {
 
 /* Internal */
 
-void BedJetHub::loop() {}
+void BedJetHub::loop() {
+  // Parent BLEClientNode has a loop() method, but this component uses
+  // polling via update() and BLE callbacks so loop isn't needed
+  this->disable_loop();
+}
 void BedJetHub::update() { this->dispatch_status_(); }
 
 void BedJetHub::dump_config() {
-  ESP_LOGCONFIG(TAG, "BedJet Hub '%s'", this->get_name().c_str());
-  ESP_LOGCONFIG(TAG, "  ble_client.app_id: %d", this->parent()->app_id);
-  ESP_LOGCONFIG(TAG, "  ble_client.conn_id: %d", this->parent()->get_conn_id());
-  LOG_UPDATE_INTERVAL(this)
+  ESP_LOGCONFIG(TAG,
+                "BedJet Hub '%s'\n"
+                "  ble_client.app_id: %d\n"
+                "  ble_client.conn_id: %d",
+                this->get_name().c_str(), this->parent()->app_id, this->parent()->get_conn_id());
+  LOG_UPDATE_INTERVAL(this);
   ESP_LOGCONFIG(TAG, "  Child components (%d):", this->children_.size());
   for (auto *child : this->children_) {
     ESP_LOGCONFIG(TAG, "    - %s", child->describe().c_str());
@@ -528,7 +533,7 @@ void BedJetHub::dispatch_status_() {
     }
 
     if (this->timeout_ > 0 && diff > this->timeout_ && this->parent()->enabled) {
-      ESP_LOGW(TAG, "[%s] Timed out after %" PRId32 " sec. Retrying...", this->get_name().c_str(), this->timeout_);
+      ESP_LOGW(TAG, "[%s] Timed out after %" PRId32 " sec. Retrying", this->get_name().c_str(), this->timeout_);
       // set_enabled(false) will only close the connection if state != IDLE.
       this->parent()->set_state(espbt::ClientState::CONNECTING);
       this->parent()->set_enabled(false);
