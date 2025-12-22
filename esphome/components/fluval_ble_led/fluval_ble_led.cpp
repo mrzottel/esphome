@@ -413,7 +413,7 @@ void FluvalBleLed::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t
     }
 
     case ESP_GATTC_REG_FOR_NOTIFY_EVT: {
-      ESP_LOGD(TAG, "[%s] Received Notification Registration", this->parent_->address_str().c_str());
+      ESP_LOGD(TAG, "[%s] Received Notification Registration", this->parent_->address_str());
       std::vector<uint8_t> descriptor = {0x01};
       auto status2 = esp_ble_gattc_write_char_descr(this->parent()->get_gattc_if(), this->parent()->get_conn_id(), 0x25,
                                                     1, const_cast<uint8_t *>(descriptor.data()),
