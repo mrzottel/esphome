@@ -12,7 +12,7 @@ static const char *const TAG = "fluval_ble_led";
 
 void FluvalBleLed::dump_config() {
   ESP_LOGCONFIG(TAG, "Fluval LED");
-  ESP_LOGCONFIG(TAG, "  Address: %s", this->parent_->address_str().c_str());
+  ESP_LOGCONFIG(TAG, "  Address: %s", this->parent_->address_str());
   ESP_LOGCONFIG(TAG, "  Number of channels: %i", this->number_of_channels_);
 }
 
@@ -290,7 +290,7 @@ void FluvalBleLed::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t
 
       ESP_LOGVV(TAG, "READ CHARS FROM %d with status %d: %s ", param->read.handle, param->read.status,
                 this->pkt_to_hex_(param->read.value, param->read.value_len - 1).c_str());
-      
+
       // HANDSHAKE STEP 1
       // ================
       if (this->handshake_step_ == 1) {
@@ -305,13 +305,13 @@ void FluvalBleLed::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t
 
       // HANDSHAKE STEP 3
       // ================
-      if (this->handshake_step_ == 3) {   
-        this->sync_time();     
+      if (this->handshake_step_ == 3) {
+        this->sync_time();
         ESP_LOGI(TAG, "Connected to Fluval LED [%s]", this->parent_->address_str().c_str());
         // Sending device read request as last part of the handshake
         std::vector<uint8_t> update{0x68, 0x05};
-        this->send_packet_(update);        
-        this->handshake_step_ = 4;                
+        this->send_packet_(update);
+        this->handshake_step_ = 4;
       }
 
       break;
@@ -345,7 +345,7 @@ void FluvalBleLed::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t
         ESP_LOGD(TAG, "READING 0x47 RESULT: %s", esp_err_to_name(errb2));
         this->handshake_step_ = 3;
       }
-  
+
       break;
     }  // ESP_GATTC_WRITE_CHAR_EVT
 
@@ -482,7 +482,7 @@ void FluvalBleLed::sync_time() {
              year, month, day, day_of_week, hour, minute, second);
 
     std::vector<uint8_t> value_sync{0x68, 0x0E, year, month, day, day_of_week, hour, minute, second};
-    this->send_packet_(value_sync);    
+    this->send_packet_(value_sync);
   }
 }
 #endif
