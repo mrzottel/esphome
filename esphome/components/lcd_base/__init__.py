@@ -1,7 +1,7 @@
 import esphome.codegen as cg
-import esphome.config_validation as cv
 from esphome.components import display
-from esphome.const import CONF_DIMENSIONS, CONF_POSITION, CONF_DATA
+import esphome.config_validation as cv
+from esphome.const import CONF_DATA, CONF_DIMENSIONS, CONF_POSITION
 
 CONF_USER_CHARACTERS = "user_characters"
 
@@ -52,7 +52,6 @@ LCD_SCHEMA = display.BASIC_DISPLAY_SCHEMA.extend(
 
 
 async def setup_lcd_display(var, config):
-    await cg.register_component(var, config)
     await display.register_display(var, config)
     cg.add(var.set_dimensions(config[CONF_DIMENSIONS][0], config[CONF_DIMENSIONS][1]))
     if CONF_USER_CHARACTERS in config:

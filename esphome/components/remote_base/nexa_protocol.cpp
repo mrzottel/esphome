@@ -6,18 +6,18 @@ namespace remote_base {
 
 static const char *const TAG = "remote.nexa";
 
-static const uint8_t NBITS = 32;
-static const uint32_t HEADER_HIGH_US = 319;
-static const uint32_t HEADER_LOW_US = 2610;
-static const uint32_t BIT_HIGH_US = 319;
-static const uint32_t BIT_ONE_LOW_US = 1000;
-static const uint32_t BIT_ZERO_LOW_US = 140;
+static constexpr uint8_t NBITS = 32;
+static constexpr uint32_t HEADER_HIGH_US = 319;
+static constexpr uint32_t HEADER_LOW_US = 2610;
+static constexpr uint32_t BIT_HIGH_US = 319;
+static constexpr uint32_t BIT_ONE_LOW_US = 1000;
+static constexpr uint32_t BIT_ZERO_LOW_US = 140;
 
-static const uint32_t TX_HEADER_HIGH_US = 250;
-static const uint32_t TX_HEADER_LOW_US = TX_HEADER_HIGH_US * 10;
-static const uint32_t TX_BIT_HIGH_US = 250;
-static const uint32_t TX_BIT_ONE_LOW_US = TX_BIT_HIGH_US * 5;
-static const uint32_t TX_BIT_ZERO_LOW_US = TX_BIT_HIGH_US * 1;
+static constexpr uint32_t TX_HEADER_HIGH_US = 250;
+static constexpr uint32_t TX_HEADER_LOW_US = TX_HEADER_HIGH_US * 10;
+static constexpr uint32_t TX_BIT_HIGH_US = 250;
+static constexpr uint32_t TX_BIT_ONE_LOW_US = TX_BIT_HIGH_US * 5;
+static constexpr uint32_t TX_BIT_ZERO_LOW_US = TX_BIT_HIGH_US * 1;
 
 void NexaProtocol::one(RemoteTransmitData *dst) const {
   // '1' => '10'
@@ -232,7 +232,7 @@ optional<NexaData> NexaProtocol::decode(RemoteReceiveData src) {
 }
 
 void NexaProtocol::dump(const NexaData &data) {
-  ESP_LOGI(TAG, "Received NEXA: device=0x%04X group=%d state=%d channel=%d level=%d", data.device, data.group,
+  ESP_LOGI(TAG, "Received NEXA: device=0x%04" PRIX32 " group=%d state=%d channel=%d level=%d", data.device, data.group,
            data.state, data.channel, data.level);
 }
 

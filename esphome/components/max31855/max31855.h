@@ -4,6 +4,8 @@
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/spi/spi.h"
 
+#include <cinttypes>
+
 namespace esphome {
 namespace max31855 {
 
@@ -16,7 +18,6 @@ class MAX31855Sensor : public sensor::Sensor,
 
   void setup() override;
   void dump_config() override;
-  float get_setup_priority() const override;
 
   void update() override;
 

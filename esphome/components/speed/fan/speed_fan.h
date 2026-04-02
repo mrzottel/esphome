@@ -10,12 +10,14 @@ namespace speed {
 
 class SpeedFan : public Component, public fan::Fan {
  public:
-  SpeedFan(output::FloatOutput *output, int speed_count) : output_(output), speed_count_(speed_count) {}
+  SpeedFan(int speed_count) : speed_count_(speed_count) {}
   void setup() override;
   void dump_config() override;
+  void set_output(output::FloatOutput *output) { this->output_ = output; }
   void set_oscillating(output::BinaryOutput *oscillating) { this->oscillating_ = oscillating; }
   void set_direction(output::BinaryOutput *direction) { this->direction_ = direction; }
-  fan::FanTraits get_traits() override;
+  void set_preset_modes(std::initializer_list<const char *> presets) { this->preset_modes_ = presets; }
+  fan::FanTraits get_traits() override { return this->traits_; }
 
  protected:
   void control(const fan::FanCall &call) override;
@@ -25,6 +27,8 @@ class SpeedFan : public Component, public fan::Fan {
   output::BinaryOutput *oscillating_{nullptr};
   output::BinaryOutput *direction_{nullptr};
   int speed_count_{};
+  fan::FanTraits traits_;
+  std::vector<const char *> preset_modes_{};
 };
 
 }  // namespace speed

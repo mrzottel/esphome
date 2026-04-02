@@ -1,10 +1,8 @@
 #include "spi.h"
 #include <vector>
 
-namespace esphome {
-namespace spi {
-
-#ifdef USE_ARDUINO
+namespace esphome::spi {
+#if defined(USE_ARDUINO) && !defined(USE_ESP32)
 
 static const char *const TAG = "spi-esp-arduino";
 class SPIDelegateHw : public SPIDelegate {
@@ -18,7 +16,7 @@ class SPIDelegateHw : public SPIDelegate {
 #elif defined(ESP8266)
     // Arduino ESP8266 library has mangled values for SPI modes :-(
     auto mode = (this->mode_ & 0x01) + ((this->mode_ & 0x02) << 3);
-    ESP_LOGV(TAG, "8266 mangled SPI mode 0x%X", mode);
+    ESP_LOGVV(TAG, "8266 mangled SPI mode 0x%X", mode);
     SPISettings const settings(this->data_rate_, this->bit_order_, mode);
 #else
     SPISettings const settings(this->data_rate_, this->bit_order_, this->mode_);
@@ -38,17 +36,28 @@ class SPIDelegateHw : public SPIDelegate {
 
   void write16(uint16_t data) override { this->channel_->transfer16(data); }
 
-#ifdef USE_RP2040
   void write_array(const uint8_t *ptr, size_t length) override {
-    // avoid overwriting the supplied buffer
-    uint8_t *rxbuf = new uint8_t[length];  // NOLINT(cppcoreguidelines-owning-memory)
-    memcpy(rxbuf, ptr, length);
-    this->channel_->transfer((void *) rxbuf, length);
-    delete[] rxbuf;  // NOLINT(cppcoreguidelines-owning-memory)
-  }
+    if (length == 1) {
+      this->channel_->transfer(*ptr);
+      return;
+    }
+#ifdef USE_RP2040
+    this->channel_->transfer(ptr, nullptr, length);
+#elif defined(USE_ESP8266)
+    // ESP8266 SPI library requires the pointer to be word aligned, but the data may not be
+    // so we need to copy the data to a temporary buffer
+    if (reinterpret_cast<uintptr_t>(ptr) & 0x3) {
+      ESP_LOGVV(TAG, "SPI write buffer not word aligned, copying to temporary buffer");
+      auto txbuf = std::vector<uint8_t>(length);
+      memcpy(txbuf.data(), ptr, length);
+      this->channel_->writeBytes(txbuf.data(), length);
+    } else {
+      this->channel_->writeBytes(ptr, length);
+    }
 #else
-  void write_array(const uint8_t *ptr, size_t length) override { this->channel_->writeBytes(ptr, length); }
+    this->channel_->writeBytes(ptr, length);
 #endif
+  }
 
   void read_array(uint8_t *ptr, size_t length) override { this->channel_->transfer(ptr, length); }
 
@@ -76,7 +85,8 @@ class SPIBusHw : public SPIBus {
 #endif
   }
 
-  SPIDelegate *get_delegate(uint32_t data_rate, SPIBitOrder bit_order, SPIMode mode, GPIOPin *cs_pin) override {
+  SPIDelegate *get_delegate(uint32_t data_rate, SPIBitOrder bit_order, SPIMode mode, GPIOPin *cs_pin,
+                            bool release_device, bool write_only) override {
     return new SPIDelegateHw(this->channel_, data_rate, bit_order, mode, cs_pin);
   }
 
@@ -85,10 +95,10 @@ class SPIBusHw : public SPIBus {
   bool is_hw() override { return true; }
 };
 
-SPIBus *SPIComponent::get_bus(SPIInterface interface, GPIOPin *clk, GPIOPin *sdo, GPIOPin *sdi) {
+SPIBus *SPIComponent::get_bus(SPIInterface interface, GPIOPin *clk, GPIOPin *sdo, GPIOPin *sdi,
+                              const std::vector<uint8_t> &data_pins) {
   return new SPIBusHw(clk, sdo, sdi, interface);
 }
 
-#endif  // USE_ARDUINO
-}  // namespace spi
-}  // namespace esphome
+#endif  // USE_ARDUINO && !USE_ESP32
+}  // namespace esphome::spi

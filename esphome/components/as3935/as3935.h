@@ -13,6 +13,9 @@
 namespace esphome {
 namespace as3935 {
 
+static const uint8_t DIRECT_COMMAND = 0x96;
+static const uint8_t ANTFREQ = 3;
+
 enum AS3935RegisterNames {
   AFE_GAIN = 0x00,
   THRESHOLD,
@@ -30,6 +33,7 @@ enum AS3935RegisterNames {
 };
 
 enum AS3935RegisterMasks {
+  WIPE_ALL = 0x0,
   GAIN_MASK = 0x3E,
   SPIKE_MASK = 0xF,
   IO_MASK = 0xC1,
@@ -37,13 +41,14 @@ enum AS3935RegisterMasks {
   INT_MASK = 0xF0,
   THRESH_MASK = 0x0F,
   R_SPIKE_MASK = 0xF0,
-  ENERGY_MASK = 0xF0,
+  ENERGY_MASK = 0xE0,
   CAP_MASK = 0xF0,
   LIGHT_MASK = 0xCF,
   DISTURB_MASK = 0xDF,
   NOISE_FLOOR_MASK = 0x70,
   OSC_MASK = 0xE0,
   CALIB_MASK = 0x7F,
+  CALIB_MASK_NOK = 0xBF,
   DIV_MASK = 0x3F
 };
 
@@ -69,7 +74,6 @@ class AS3935Component : public Component {
  public:
   void setup() override;
   void dump_config() override;
-  float get_setup_priority() const override;
   void loop() override;
 
   void set_irq_pin(GPIOPin *irq_pin) { irq_pin_ = irq_pin; }
@@ -90,6 +94,13 @@ class AS3935Component : public Component {
   void write_div_ratio(uint8_t div_ratio);
   void set_capacitance(uint8_t capacitance) { capacitance_ = capacitance; }
   void write_capacitance(uint8_t capacitance);
+  uint8_t read_div_ratio();
+  uint8_t read_capacitance();
+  bool calibrate_oscillator();
+  void display_oscillator(bool state, uint8_t osc);
+  void tune_antenna();
+  void set_tune_antenna(bool tune_antenna) { tune_antenna_ = tune_antenna; }
+  void set_calibration(bool calibration) { calibration_ = calibration; }
 
  protected:
   uint8_t read_interrupt_register_();
@@ -112,6 +123,8 @@ class AS3935Component : public Component {
   bool mask_disturber_;
   uint8_t div_ratio_;
   uint8_t capacitance_;
+  bool tune_antenna_;
+  bool calibration_;
 };
 
 }  // namespace as3935

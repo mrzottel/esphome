@@ -6,12 +6,12 @@ namespace remote_base {
 
 static const char *const TAG = "remote.jvc";
 
-static const uint8_t NBITS = 16;
-static const uint32_t HEADER_HIGH_US = 8400;
-static const uint32_t HEADER_LOW_US = 4200;
-static const uint32_t BIT_ONE_LOW_US = 1725;
-static const uint32_t BIT_ZERO_LOW_US = 525;
-static const uint32_t BIT_HIGH_US = 525;
+static constexpr uint8_t NBITS = 16;
+static constexpr uint32_t HEADER_HIGH_US = 8400;
+static constexpr uint32_t HEADER_LOW_US = 4200;
+static constexpr uint32_t BIT_ONE_LOW_US = 1725;
+static constexpr uint32_t BIT_ZERO_LOW_US = 525;
+static constexpr uint32_t BIT_HIGH_US = 525;
 
 void JVCProtocol::encode(RemoteTransmitData *dst, const JVCData &data) {
   dst->set_carrier_frequency(38000);
@@ -46,7 +46,7 @@ optional<JVCData> JVCProtocol::decode(RemoteReceiveData src) {
   }
   return out;
 }
-void JVCProtocol::dump(const JVCData &data) { ESP_LOGI(TAG, "Received JVC: data=0x%04X", data.data); }
+void JVCProtocol::dump(const JVCData &data) { ESP_LOGI(TAG, "Received JVC: data=0x%04" PRIX32, data.data); }
 
 }  // namespace remote_base
 }  // namespace esphome

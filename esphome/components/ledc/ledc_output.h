@@ -4,11 +4,11 @@
 #include "esphome/core/hal.h"
 #include "esphome/core/automation.h"
 #include "esphome/components/output/float_output.h"
+#include <cstdint>
 
 #ifdef USE_ESP32
 
-namespace esphome {
-namespace ledc {
+namespace esphome::ledc {
 
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern uint8_t next_ledc_channel;
@@ -19,6 +19,7 @@ class LEDCOutput : public output::FloatOutput, public Component {
 
   void set_channel(uint8_t channel) { this->channel_ = channel; }
   void set_frequency(float frequency) { this->frequency_ = frequency; }
+  void set_phase_angle(float angle) { this->phase_angle_ = angle; }
   /// Dynamically change frequency at runtime
   void update_frequency(float frequency) override;
 
@@ -35,8 +36,10 @@ class LEDCOutput : public output::FloatOutput, public Component {
   InternalGPIOPin *pin_;
   uint8_t channel_{};
   uint8_t bit_depth_{};
+  float phase_angle_{0.0f};
   float frequency_{};
   float duty_{0.0f};
+  uint32_t last_duty_{UINT32_MAX};
   bool initialized_ = false;
 };
 
@@ -45,7 +48,7 @@ template<typename... Ts> class SetFrequencyAction : public Action<Ts...> {
   SetFrequencyAction(LEDCOutput *parent) : parent_(parent) {}
   TEMPLATABLE_VALUE(float, frequency);
 
-  void play(Ts... x) {
+  void play(const Ts &...x) {
     float freq = this->frequency_.value(x...);
     this->parent_->update_frequency(freq);
   }
@@ -54,7 +57,6 @@ template<typename... Ts> class SetFrequencyAction : public Action<Ts...> {
   LEDCOutput *parent_;
 };
 
-}  // namespace ledc
-}  // namespace esphome
+}  // namespace esphome::ledc
 
 #endif

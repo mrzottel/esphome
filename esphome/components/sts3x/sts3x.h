@@ -4,6 +4,8 @@
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/sensirion_common/i2c_sensirion.h"
 
+#include <cinttypes>
+
 namespace esphome {
 namespace sts3x {
 
@@ -12,7 +14,6 @@ class STS3XComponent : public sensor::Sensor, public PollingComponent, public se
  public:
   void setup() override;
   void dump_config() override;
-  float get_setup_priority() const override;
   void update() override;
 };
 

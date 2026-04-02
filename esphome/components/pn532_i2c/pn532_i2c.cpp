@@ -12,6 +12,14 @@ namespace pn532_i2c {
 
 static const char *const TAG = "pn532_i2c";
 
+bool PN532I2C::is_read_ready() {
+  uint8_t ready;
+  if (!this->read_bytes_raw(&ready, 1)) {
+    return false;
+  }
+  return ready == 0x01;
+}
+
 bool PN532I2C::write_data(const std::vector<uint8_t> &data) {
   return this->write(data.data(), data.size()) == i2c::ERROR_OK;
 }
@@ -19,19 +27,8 @@ bool PN532I2C::write_data(const std::vector<uint8_t> &data) {
 bool PN532I2C::read_data(std::vector<uint8_t> &data, uint8_t len) {
   delay(1);
 
-  std::vector<uint8_t> ready;
-  ready.resize(1);
-  uint32_t start_time = millis();
-  while (true) {
-    if (this->read_bytes_raw(ready.data(), 1)) {
-      if (ready[0] == 0x01)
-        break;
-    }
-
-    if (millis() - start_time > 100) {
-      ESP_LOGV(TAG, "Timed out waiting for readiness from PN532!");
-      return false;
-    }
+  if (this->read_ready_(true) != pn532::PN532ReadReady::READY) {
+    return false;
   }
 
   data.resize(len + 1);
@@ -52,7 +49,7 @@ bool PN532I2C::read_response(uint8_t command, std::vector<uint8_t> &data) {
     return false;
   }
 
-  if (data[1] != 0x00 && data[2] != 0x00 && data[3] != 0xFF) {
+  if (data[1] != 0x00 || data[2] != 0x00 || data[3] != 0xFF) {
     // invalid packet
     ESP_LOGV(TAG, "read data invalid preamble!");
     return false;
@@ -98,7 +95,7 @@ uint8_t PN532I2C::read_response_length_() {
     return 0;
   }
 
-  if (data[1] != 0x00 && data[2] != 0x00 && data[3] != 0xFF) {
+  if (data[1] != 0x00 || data[2] != 0x00 || data[3] != 0xFF) {
     // invalid packet
     ESP_LOGV(TAG, "read data invalid preamble!");
     return 0;

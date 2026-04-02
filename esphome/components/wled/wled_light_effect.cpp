@@ -1,8 +1,8 @@
 #ifdef USE_ARDUINO
 
 #include "wled_light_effect.h"
-#include "esphome/core/log.h"
 #include "esphome/core/helpers.h"
+#include "esphome/core/log.h"
 
 #ifdef USE_ESP32
 #include <WiFi.h>
@@ -13,6 +13,10 @@
 #include <WiFiUdp.h>
 #endif
 
+#ifdef USE_BK72XX
+#include <WiFiUdp.h>
+#endif
+
 namespace esphome {
 namespace wled {
 
@@ -20,16 +24,21 @@ namespace wled {
 // https://github.com/Aircoookie/WLED/wiki/UDP-Realtime-Control
 enum Protocol { WLED_NOTIFIER = 0, WARLS = 1, DRGB = 2, DRGBW = 3, DNRGB = 4 };
 
-const int DEFAULT_BLANK_TIME = 1000;
+constexpr uint32_t DEFAULT_BLANK_TIME = 1000;
 
 static const char *const TAG = "wled_light_effect";
 
-WLEDLightEffect::WLEDLightEffect(const std::string &name) : AddressableLightEffect(name) {}
+WLEDLightEffect::WLEDLightEffect(const char *name) : AddressableLightEffect(name) {}
 
 void WLEDLightEffect::start() {
   AddressableLightEffect::start();
 
-  blank_at_ = 0;
+  if (this->blank_on_start_) {
+    this->blank_start_ = millis();
+    this->blank_timeout_ = 0;
+  } else {
+    this->blank_start_.reset();
+  }
 }
 
 void WLEDLightEffect::stop() {
@@ -73,10 +82,10 @@ void WLEDLightEffect::apply(light::AddressableLight &it, const Color &current_co
     }
   }
 
-  // FIXME: Use roll-over safe arithmetic
-  if (blank_at_ < millis()) {
+  if (this->blank_start_.has_value() && millis() - *this->blank_start_ >= this->blank_timeout_) {
     blank_all_leds_(it);
-    blank_at_ = millis() + DEFAULT_BLANK_TIME;
+    this->blank_start_ = millis();
+    this->blank_timeout_ = DEFAULT_BLANK_TIME;
   }
 }
 
@@ -101,8 +110,11 @@ bool WLEDLightEffect::parse_frame_(light::AddressableLight &it, const uint8_t *p
         if (!parse_drgb_frame_(it, payload, size))
           return false;
       } else {
-        if (!parse_notifier_frame_(it, payload, size))
+        if (!parse_notifier_frame_(it, payload, size)) {
           return false;
+        } else {
+          timeout = UINT8_MAX;
+        }
       }
       break;
 
@@ -131,11 +143,13 @@ bool WLEDLightEffect::parse_frame_(light::AddressableLight &it, const uint8_t *p
   }
 
   if (timeout == UINT8_MAX) {
-    blank_at_ = UINT32_MAX;
+    this->blank_start_.reset();
   } else if (timeout > 0) {
-    blank_at_ = millis() + timeout * 1000;
+    this->blank_start_ = millis();
+    this->blank_timeout_ = timeout * 1000;
   } else {
-    blank_at_ = millis() + DEFAULT_BLANK_TIME;
+    this->blank_start_ = millis();
+    this->blank_timeout_ = DEFAULT_BLANK_TIME;
   }
 
   it.schedule_show();
@@ -143,8 +157,32 @@ bool WLEDLightEffect::parse_frame_(light::AddressableLight &it, const uint8_t *p
 }
 
 bool WLEDLightEffect::parse_notifier_frame_(light::AddressableLight &it, const uint8_t *payload, uint16_t size) {
-  // Packet needs to be empty
-  return size == 0;
+  // Receive at least RGBW and Brightness for all LEDs from WLED Sync Notification
+  // https://kno.wled.ge/interfaces/udp-notifier/
+  // https://github.com/Aircoookie/WLED/blob/main/wled00/udp.cpp
+
+  if (size <= 34) {
+    return false;
+  }
+
+  uint8_t payload_sync_group_mask = payload[34];
+
+  if (this->sync_group_mask_ && !(payload_sync_group_mask & this->sync_group_mask_)) {
+    ESP_LOGD(TAG, "sync group mask does not match");
+    return false;
+  }
+
+  uint8_t bri = payload[0];
+  uint8_t r = esp_scale8(payload[1], bri);
+  uint8_t g = esp_scale8(payload[2], bri);
+  uint8_t b = esp_scale8(payload[3], bri);
+  uint8_t w = esp_scale8(payload[8], bri);
+
+  for (auto &&led : it) {
+    led.set(Color(r, g, b, w));
+  }
+
+  return true;
 }
 
 bool WLEDLightEffect::parse_warls_frame_(light::AddressableLight &it, const uint8_t *payload, uint16_t size) {
