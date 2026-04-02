@@ -65,7 +65,7 @@ async def to_code(config):
 
 
 @automation.register_action(
-    "fluval_ble_led.sync_time", SyncTimeAction, FLUVAL_BLE_LED_SYNC_TIME_SCHEMA
+    "fluval_ble_led.sync_time", SyncTimeAction, FLUVAL_BLE_LED_SYNC_TIME_SCHEMA, synchronous=False
 )
 async def sync_time_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
