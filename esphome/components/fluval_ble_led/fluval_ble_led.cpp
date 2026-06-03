@@ -235,7 +235,14 @@ void FluvalBleLed::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t
     // ==============================
     case ESP_GATTC_SEARCH_CMPL_EVT: {
       auto *chr = this->parent()->get_characteristic(FLUVAL_SERVICE_UUID, FLUVAL_CHARACTERISTIC_READ);
-      auto status = esp_ble_gattc_register_for_notify(this->parent()->get_gattc_if(), this->parent()->get_remote_bda(),
+      if (chr == nullptr) {
+        ESP_LOGE(TAG, "Characteristic not found, skipping notify registration");
+        auto *svc = this->parent()->get_service(FLUVAL_SERVICE_UUID);
+        if (svc == nullptr) { ESP_LOGE(TAG, "Service 1000 NOT FOUND"); }
+        break;
+      }
+      auto status = esp_ble_gattc_register_for_notify(this->parent()->get_gattc_if(),
+                                                      this->parent()->get_remote_bda(),
                                                       chr->handle);
       if (status == 0) {
         ESP_LOGD(TAG, "esp_ble_gattc_register_for_notify success, status=%d", status);

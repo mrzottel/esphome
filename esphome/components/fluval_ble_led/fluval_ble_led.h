@@ -21,15 +21,15 @@ namespace fluval_ble_led {
 
 namespace espbt = esphome::esp32_ble_tracker;
 
-static const espbt::ESPBTUUID FLUVAL_SERVICE_UUID = espbt::ESPBTUUID::from_raw("00001000-0000-1000-8000-00805F9B34FB");
+static const espbt::ESPBTUUID FLUVAL_SERVICE_UUID = espbt::ESPBTUUID::from_raw("00001000-0000-1000-8000-00805f9b34fb");
 static const espbt::ESPBTUUID FLUVAL_CHARACTERISTIC_WRITE =
-    espbt::ESPBTUUID::from_raw("00001001-0000-1000-8000-00805F9B34FB");  // notify, read, write, write no response
+    espbt::ESPBTUUID::from_raw("00001001-0000-1000-8000-00805f9b34fb");  // notify, read, write, write no response
 static const espbt::ESPBTUUID FLUVAL_CHARACTERISTIC_READ =
-    espbt::ESPBTUUID::from_raw("00001002-0000-1000-8000-00805F9B34FB");  // notify, read
+    espbt::ESPBTUUID::from_raw("00001002-0000-1000-8000-00805f9b34fb");  // notify, read
 static const espbt::ESPBTUUID FLUVAL_CHARACTERISTIC_READ_REG =
-    espbt::ESPBTUUID::from_raw("00001004-0000-1000-8000-00805F9B34FB");  //  read
+    espbt::ESPBTUUID::from_raw("00001004-0000-1000-8000-00805f9b34fb");  //  read
 static const espbt::ESPBTUUID FLUVAL_CHARACTERISTIC_WRITE_REG_ID =
-    espbt::ESPBTUUID::from_raw("00001005-0000-1000-8000-00805F9B34FB");  // write
+    espbt::ESPBTUUID::from_raw("00001005-0000-1000-8000-00805f9b34fb");  // write
 
 static const uint8_t MANUAL_MODE = 0x00;
 static const uint8_t AUTO_MODE = 0x01;
