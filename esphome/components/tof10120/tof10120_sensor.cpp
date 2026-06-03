@@ -1,6 +1,7 @@
 #include "tof10120_sensor.h"
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
+#include <cinttypes>
 
 // Very basic support for TOF10120 distance sensor
 
@@ -26,7 +27,7 @@ void TOF10120Sensor::setup() {}
 
 void TOF10120Sensor::update() {
   if (!this->write_bytes(TOF10120_DISTANCE_REGISTER, TOF10120_READ_DISTANCE_CMD, sizeof(TOF10120_READ_DISTANCE_CMD))) {
-    ESP_LOGE(TAG, "Communication with TOF10120 failed on write");
+    ESP_LOGE(TAG, ESP_LOG_MSG_COMM_FAIL);
     this->status_set_warning();
     return;
   }
@@ -38,13 +39,13 @@ void TOF10120Sensor::update() {
   }
   delay(TOF10120_DEFAULT_DELAY);
   if (this->read(data, 2) != i2c::ERROR_OK) {
-    ESP_LOGE(TAG, "Communication with TOF10120 failed on read");
+    ESP_LOGE(TAG, ESP_LOG_MSG_COMM_FAIL);
     this->status_set_warning();
     return;
   }
 
   uint32_t distance_mm = (data[0] << 8) | data[1];
-  ESP_LOGI(TAG, "Data read: %dmm", distance_mm);
+  ESP_LOGI(TAG, "Data read: %" PRIu32 "mm", distance_mm);
 
   if (distance_mm == TOF10120_OUT_OF_RANGE_VALUE) {
     ESP_LOGW(TAG, "Distance measurement out of range");

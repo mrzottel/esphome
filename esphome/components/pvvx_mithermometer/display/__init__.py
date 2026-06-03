@@ -1,6 +1,6 @@
 import esphome.codegen as cg
-import esphome.config_validation as cv
 from esphome.components import ble_client, display, time
+import esphome.config_validation as cv
 from esphome.const import (
     CONF_AUTO_CLEAR_ENABLED,
     CONF_DISCONNECT_DELAY,
@@ -38,7 +38,6 @@ CONFIG_SCHEMA = (
 
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
-    await cg.register_component(var, config)
     await display.register_display(var, config)
     await ble_client.register_ble_node(var, config)
     cg.add(var.set_disconnect_delay(config[CONF_DISCONNECT_DELAY].total_milliseconds))

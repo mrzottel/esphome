@@ -3,6 +3,8 @@
 #include "esphome/core/component.h"
 #include "esphome/core/hal.h"
 
+#include <vector>
+
 namespace esphome {
 namespace lightwaverf {
 
@@ -60,8 +62,8 @@ class LwTx {
   uint8_t tx_repeats = 12;  // Number of repeats of message sent
   uint8_t txon = 1;
   uint8_t txoff = 0;
-  bool tx_msg_active = false;  // set true to activate message sending
-  bool tx_translate = true;    // Set false to send raw data
+  volatile bool tx_msg_active = false;  // set true to activate message sending
+  bool tx_translate = true;             // Set false to send raw data
 
   uint8_t tx_buf[TX_MSGLEN];  // the message buffer during reception
   uint8_t tx_repeat = 0;      // counter for repeats

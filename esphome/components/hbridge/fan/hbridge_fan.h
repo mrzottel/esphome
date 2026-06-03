@@ -20,10 +20,11 @@ class HBridgeFan : public Component, public fan::Fan {
   void set_pin_a(output::FloatOutput *pin_a) { pin_a_ = pin_a; }
   void set_pin_b(output::FloatOutput *pin_b) { pin_b_ = pin_b; }
   void set_enable_pin(output::FloatOutput *enable) { enable_ = enable; }
+  void set_preset_modes(std::initializer_list<const char *> presets) { preset_modes_ = presets; }
 
   void setup() override;
   void dump_config() override;
-  fan::FanTraits get_traits() override;
+  fan::FanTraits get_traits() override { return this->traits_; }
 
   fan::FanCall brake();
 
@@ -34,6 +35,8 @@ class HBridgeFan : public Component, public fan::Fan {
   output::BinaryOutput *oscillating_{nullptr};
   int speed_count_{};
   DecayMode decay_mode_{DECAY_MODE_SLOW};
+  fan::FanTraits traits_;
+  std::vector<const char *> preset_modes_{};
 
   void control(const fan::FanCall &call) override;
   void write_state_();
@@ -46,7 +49,7 @@ template<typename... Ts> class BrakeAction : public Action<Ts...> {
  public:
   explicit BrakeAction(HBridgeFan *parent) : parent_(parent) {}
 
-  void play(Ts... x) override { this->parent_->brake(); }
+  void play(const Ts &...x) override { this->parent_->brake(); }
 
   HBridgeFan *parent_;
 };

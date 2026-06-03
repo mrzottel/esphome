@@ -10,11 +10,11 @@ namespace remote_base {
 
 static const char *const TAG = "remote.magiquest";
 
-static const uint32_t MAGIQUEST_UNIT = 288;  // us
-static const uint32_t MAGIQUEST_ONE_MARK = 2 * MAGIQUEST_UNIT;
-static const uint32_t MAGIQUEST_ONE_SPACE = 2 * MAGIQUEST_UNIT;
-static const uint32_t MAGIQUEST_ZERO_MARK = MAGIQUEST_UNIT;
-static const uint32_t MAGIQUEST_ZERO_SPACE = 3 * MAGIQUEST_UNIT;
+static constexpr uint32_t MAGIQUEST_UNIT = 288;  // us
+static constexpr uint32_t MAGIQUEST_ONE_MARK = 2 * MAGIQUEST_UNIT;
+static constexpr uint32_t MAGIQUEST_ONE_SPACE = 2 * MAGIQUEST_UNIT;
+static constexpr uint32_t MAGIQUEST_ZERO_MARK = MAGIQUEST_UNIT;
+static constexpr uint32_t MAGIQUEST_ZERO_SPACE = 3 * MAGIQUEST_UNIT;
 
 void MagiQuestProtocol::encode(RemoteTransmitData *dst, const MagiQuestData &data) {
   dst->reserve(101);  // 2 start bits, 48 data bits, 1 stop bit
@@ -76,7 +76,7 @@ optional<MagiQuestData> MagiQuestProtocol::decode(RemoteReceiveData src) {
   return data;
 }
 void MagiQuestProtocol::dump(const MagiQuestData &data) {
-  ESP_LOGI(TAG, "Received MagiQuest: wand_id=0x%08X, magnitude=0x%04X", data.wand_id, data.magnitude);
+  ESP_LOGI(TAG, "Received MagiQuest: wand_id=0x%08" PRIX32 ", magnitude=0x%04X", data.wand_id, data.magnitude);
 }
 
 }  // namespace remote_base

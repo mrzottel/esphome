@@ -18,29 +18,32 @@ namespace climate_ir {
     Likewise to decode a IR into the AC state, implement
       bool RemoteReceiverListener::on_receive(remote_base::RemoteReceiveData data) and return true
 */
-class ClimateIR : public climate::Climate, public Component, public remote_base::RemoteReceiverListener {
+class ClimateIR : public Component,
+                  public climate::Climate,
+                  public remote_base::RemoteReceiverListener,
+                  public remote_base::RemoteTransmittable {
  public:
   ClimateIR(float minimum_temperature, float maximum_temperature, float temperature_step = 1.0f,
-            bool supports_dry = false, bool supports_fan_only = false, std::set<climate::ClimateFanMode> fan_modes = {},
-            std::set<climate::ClimateSwingMode> swing_modes = {}, std::set<climate::ClimatePreset> presets = {}) {
+            bool supports_dry = false, bool supports_fan_only = false,
+            climate::ClimateFanModeMask fan_modes = climate::ClimateFanModeMask(),
+            climate::ClimateSwingModeMask swing_modes = climate::ClimateSwingModeMask(),
+            climate::ClimatePresetMask presets = climate::ClimatePresetMask()) {
     this->minimum_temperature_ = minimum_temperature;
     this->maximum_temperature_ = maximum_temperature;
     this->temperature_step_ = temperature_step;
     this->supports_dry_ = supports_dry;
     this->supports_fan_only_ = supports_fan_only;
-    this->fan_modes_ = std::move(fan_modes);
-    this->swing_modes_ = std::move(swing_modes);
-    this->presets_ = std::move(presets);
+    this->fan_modes_ = fan_modes;
+    this->swing_modes_ = swing_modes;
+    this->presets_ = presets;
   }
 
   void setup() override;
   void dump_config() override;
-  void set_transmitter(remote_transmitter::RemoteTransmitterComponent *transmitter) {
-    this->transmitter_ = transmitter;
-  }
   void set_supports_cool(bool supports_cool) { this->supports_cool_ = supports_cool; }
   void set_supports_heat(bool supports_heat) { this->supports_heat_ = supports_heat; }
   void set_sensor(sensor::Sensor *sensor) { this->sensor_ = sensor; }
+  void set_humidity_sensor(sensor::Sensor *sensor) { this->humidity_sensor_ = sensor; }
 
  protected:
   float minimum_temperature_, maximum_temperature_, temperature_step_;
@@ -60,12 +63,12 @@ class ClimateIR : public climate::Climate, public Component, public remote_base:
   bool supports_heat_{true};
   bool supports_dry_{false};
   bool supports_fan_only_{false};
-  std::set<climate::ClimateFanMode> fan_modes_ = {};
-  std::set<climate::ClimateSwingMode> swing_modes_ = {};
-  std::set<climate::ClimatePreset> presets_ = {};
+  climate::ClimateFanModeMask fan_modes_{};
+  climate::ClimateSwingModeMask swing_modes_{};
+  climate::ClimatePresetMask presets_{};
 
-  remote_transmitter::RemoteTransmitterComponent *transmitter_;
   sensor::Sensor *sensor_{nullptr};
+  sensor::Sensor *humidity_sensor_{nullptr};
 };
 
 }  // namespace climate_ir

@@ -1,6 +1,6 @@
 #include "ssd1351_base.h"
-#include "esphome/core/log.h"
 #include "esphome/core/helpers.h"
+#include "esphome/core/log.h"
 
 namespace esphome {
 namespace ssd1351_base {
@@ -112,6 +112,9 @@ void SSD1351::set_brightness(float brightness) {
   } else {
     this->brightness_ = brightness;
   }
+  if (!this->is_ready()) {
+    return;  // Component is not yet setup skip the command
+  }
   // now write the new brightness level to the display
   this->command(SSD1351_CONTRASTMASTER);
   this->data(int(SSD1351_MAX_CONTRAST * (this->brightness_)));
@@ -157,6 +160,12 @@ void HOT SSD1351::draw_absolute_pixel_internal(int x, int y, Color color) {
   this->buffer_[pos] = color565 & 0xff;
 }
 void SSD1351::fill(Color color) {
+  // If clipping is active, fall back to base implementation
+  if (this->get_clipping().is_set()) {
+    Display::fill(color);
+    return;
+  }
+
   const uint32_t color565 = display::ColorUtil::color_to_565(color);
   for (uint32_t i = 0; i < this->get_buffer_length_(); i++) {
     if (i & 1) {

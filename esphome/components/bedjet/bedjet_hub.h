@@ -141,7 +141,7 @@ class BedJetHub : public esphome::ble_client::BLEClientNode, public PollingCompo
 #ifdef USE_TIME
   /** Initializes time sync callbacks to support syncing current time to the BedJet. */
   void setup_time_();
-  optional<time::RealTimeClock *> time_id_{};
+  time::RealTimeClock *time_id_{nullptr};
 #endif
 
   uint32_t timeout_{DEFAULT_STATUS_TIMEOUT};
@@ -164,10 +164,10 @@ class BedJetHub : public esphome::ble_client::BLEClientNode, public PollingCompo
   std::unique_ptr<BedjetCodec> codec_;
 
   bool discover_characteristics_();
-  uint16_t char_handle_cmd_;
-  uint16_t char_handle_name_;
-  uint16_t char_handle_status_;
-  uint16_t config_descr_status_;
+  uint16_t char_handle_cmd_{0};
+  uint16_t char_handle_name_{0};
+  uint16_t char_handle_status_{0};
+  uint16_t config_descr_status_{0};
 
   uint8_t write_notify_config_descriptor_(bool enable);
 };
