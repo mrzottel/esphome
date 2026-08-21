@@ -1,3 +1,5 @@
+from typing import Any
+
 from esphome import automation
 import esphome.codegen as cg
 from esphome.components import i2c, sensor
@@ -15,7 +17,7 @@ from esphome.const import (
     CONF_NAME,
     CONF_REPEAT,
     CONF_TYPE,
-    DEVICE_CLASS_DISTANCE,
+    DEVICE_CLASS_EMPTY,
     DEVICE_CLASS_ILLUMINANCE,
     ICON_BRIGHTNESS_5,
     ICON_BRIGHTNESS_6,
@@ -24,6 +26,7 @@ from esphome.const import (
     UNIT_LUX,
     UNIT_MILLISECOND,
 )
+from esphome.types import ConfigType
 
 CODEOWNERS = ["@latonita"]
 DEPENDENCIES = ["i2c"]
@@ -87,17 +90,17 @@ PS_GAINS = {
 }
 
 
-def validate_integration_time(value):
+def validate_integration_time(value: Any) -> Any:
     value = cv.positive_time_period_milliseconds(value).total_milliseconds
     return cv.enum(INTEGRATION_TIMES, int=True)(value)
 
 
-def validate_repeat_rate(value):
+def validate_repeat_rate(value: Any) -> Any:
     value = cv.positive_time_period_milliseconds(value).total_milliseconds
     return cv.enum(MEASUREMENT_REPEAT_RATES, int=True)(value)
 
 
-def validate_time_and_repeat_rate(config):
+def validate_time_and_repeat_rate(config: ConfigType) -> ConfigType:
     integraton_time = config[CONF_INTEGRATION_TIME]
     repeat_rate = config[CONF_REPEAT]
     if integraton_time > repeat_rate:
@@ -107,7 +110,7 @@ def validate_time_and_repeat_rate(config):
     return config
 
 
-def validate_als_gain_and_integration_time(config):
+def validate_als_gain_and_integration_time(config: ConfigType) -> ConfigType:
     integraton_time = config[CONF_INTEGRATION_TIME]
     if config[CONF_GAIN] == "1X" and integraton_time > 100:
         raise cv.Invalid(
@@ -159,7 +162,7 @@ CONFIG_SCHEMA = cv.All(
                     unit_of_measurement=UNIT_COUNTS,
                     icon=ICON_BRIGHTNESS_5,
                     accuracy_decimals=0,
-                    device_class=DEVICE_CLASS_ILLUMINANCE,
+                    device_class=DEVICE_CLASS_EMPTY,
                     state_class=STATE_CLASS_MEASUREMENT,
                 ),
                 key=CONF_NAME,
@@ -169,7 +172,7 @@ CONFIG_SCHEMA = cv.All(
                     unit_of_measurement=UNIT_COUNTS,
                     icon=ICON_BRIGHTNESS_7,
                     accuracy_decimals=0,
-                    device_class=DEVICE_CLASS_ILLUMINANCE,
+                    device_class=DEVICE_CLASS_EMPTY,
                     state_class=STATE_CLASS_MEASUREMENT,
                 ),
                 key=CONF_NAME,
@@ -179,7 +182,7 @@ CONFIG_SCHEMA = cv.All(
                     unit_of_measurement=UNIT_COUNTS,
                     icon=ICON_PROXIMITY,
                     accuracy_decimals=0,
-                    device_class=DEVICE_CLASS_DISTANCE,
+                    device_class=DEVICE_CLASS_EMPTY,
                     state_class=STATE_CLASS_MEASUREMENT,
                 ),
                 key=CONF_NAME,
@@ -188,7 +191,7 @@ CONFIG_SCHEMA = cv.All(
                 sensor.sensor_schema(
                     icon=ICON_GAIN,
                     accuracy_decimals=0,
-                    device_class=DEVICE_CLASS_ILLUMINANCE,
+                    device_class=DEVICE_CLASS_EMPTY,
                     state_class=STATE_CLASS_MEASUREMENT,
                 ),
                 key=CONF_NAME,
@@ -211,7 +214,17 @@ CONFIG_SCHEMA = cv.All(
 )
 
 
-async def to_code(config):
+_CALLBACK_AUTOMATIONS = (
+    automation.CallbackAutomation(
+        CONF_ON_PS_HIGH_THRESHOLD, "add_on_ps_high_trigger_callback"
+    ),
+    automation.CallbackAutomation(
+        CONF_ON_PS_LOW_THRESHOLD, "add_on_ps_low_trigger_callback"
+    ),
+)
+
+
+async def to_code(config: ConfigType) -> None:
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
     await i2c.register_i2c_device(var, config)
@@ -240,14 +253,7 @@ async def to_code(config):
         sens = await sensor.new_sensor(prox_cnt_config)
         cg.add(var.set_proximity_counts_sensor(sens))
 
-    for conf in config.get(CONF_ON_PS_HIGH_THRESHOLD, []):
-        await automation.build_callback_automation(
-            var, "add_on_ps_high_trigger_callback", [], conf
-        )
-    for conf in config.get(CONF_ON_PS_LOW_THRESHOLD, []):
-        await automation.build_callback_automation(
-            var, "add_on_ps_low_trigger_callback", [], conf
-        )
+    await automation.build_callback_automations(var, config, _CALLBACK_AUTOMATIONS)
 
     cg.add(var.set_ltr_type(config[CONF_TYPE]))
 

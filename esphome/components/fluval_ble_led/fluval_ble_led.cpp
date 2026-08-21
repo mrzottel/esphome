@@ -296,7 +296,7 @@ void FluvalBleLed::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t
       }
 
       ESP_LOGVV(TAG, "READ CHARS FROM %d with status %d: %s ", param->read.handle, param->read.status,
-                this->pkt_to_hex_(param->read.value, param->read.value_len - 1));
+                this->pkt_to_hex_(param->read.value, param->read.value_len - 1).c_str());
 
       // HANDSHAKE STEP 1
       // ================
@@ -360,7 +360,7 @@ void FluvalBleLed::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t
       ESP_LOGVV(TAG, "[%s] ESP_GATTC_NOTIFY_EVT: handle=0x%x, value=0x%x, len=%d", this->parent_->address_str(),
                 param->notify.handle, param->notify.value[0], param->notify.value_len);
 
-      ESP_LOGVV(TAG, "Data Encrypted: %s ", this->pkt_to_hex_(param->notify.value, param->notify.value_len));
+      ESP_LOGVV(TAG, "Data Encrypted: %s ", this->pkt_to_hex_(param->notify.value, param->notify.value_len).c_str());
 
       if (param->notify.value_len <= 3) {
         ESP_LOGE(TAG, "Received packet too small");
@@ -370,7 +370,7 @@ void FluvalBleLed::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t
       uint8_t decrypted_data[param->notify.value_len - 3];
       memset(decrypted_data, 0, param->notify.value_len - 3);
 
-      ESP_LOGVV(TAG, "Data Ecrypted: %s ", this->pkt_to_hex_(param->notify.value, param->notify.value_len - 1));
+      ESP_LOGVV(TAG, "Data Ecrypted: %s ", this->pkt_to_hex_(param->notify.value, param->notify.value_len - 1).c_str());
       this->decrypt_(param->notify.value, param->notify.value_len, decrypted_data);
 
       uint8_t decrypted_length = param->notify.value_len - 3;

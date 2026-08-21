@@ -3,6 +3,7 @@ import re
 from esphome import automation, core
 from esphome.automation import maybe_simple_id
 import esphome.codegen as cg
+from esphome.components.const import CONF_LABEL
 from esphome.components.number import Number
 from esphome.components.select import Select
 from esphome.components.switch import Switch
@@ -30,7 +31,6 @@ display_menu_base_ns = cg.esphome_ns.namespace("display_menu_base")
 
 CONF_ROTARY = "rotary"
 CONF_JOYSTICK = "joystick"
-CONF_LABEL = "label"
 CONF_MENU = "menu"
 CONF_BACK = "back"
 CONF_SELECT = "select"
@@ -119,7 +119,7 @@ DisplayMenuOnPrevTrigger = display_menu_base_ns.class_(
 
 
 def validate_format(format):
-    if re.search(r"^%([+-])*(\d+)*(\.\d+)*[fg]$", format) is None:
+    if re.search(r"^%[+-]*(\d+)?(\.\d+)?[fg]$", format) is None:
         raise cv.Invalid(
             f"{CONF_FORMAT}: has to specify a printf-like format string specifying exactly one f or g type conversion, '{format}' provided"
         )

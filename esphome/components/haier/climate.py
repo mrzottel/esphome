@@ -215,9 +215,7 @@ CONFIG_SCHEMA = cv.All(
                 {
                     cv.Optional(
                         CONF_CONTROL_METHOD, default="SET_GROUP_PARAMETERS"
-                    ): cv.ensure_list(
-                        cv.enum(SUPPORTED_HON_CONTROL_METHODS, upper=True)
-                    ),
+                    ): cv.enum(SUPPORTED_HON_CONTROL_METHODS, upper=True),
                     cv.Optional(CONF_BEEPER): cv.invalid(
                         f"The {CONF_BEEPER} option is deprecated, use beeper_on/beeper_off actions or beeper switch for a haier platform instead"
                     ),
@@ -426,7 +424,7 @@ async def power_action_to_code(config, action_id, template_arg, args):
     return cg.new_Pvariable(action_id, template_arg, paren)
 
 
-def _final_validate(config):
+def _final_validate(config) -> None:
     full_config = fv.full_config.get()
     if CONF_LOGGER in full_config:
         _level = "NONE"
@@ -450,10 +448,28 @@ def _final_validate(config):
         raise cv.Invalid(
             f"No WiFi configured, if you want to use haier climate without WiFi add {CONF_WIFI_SIGNAL}: false to climate configuration"
         )
-    return config
 
 
 FINAL_VALIDATE_SCHEMA = _final_validate
+
+
+_CALLBACK_AUTOMATIONS = (
+    automation.CallbackAutomation(
+        CONF_ON_ALARM_START,
+        "add_alarm_start_callback",
+        [(cg.uint8, "code"), (cg.const_char_ptr, "message")],
+    ),
+    automation.CallbackAutomation(
+        CONF_ON_ALARM_END,
+        "add_alarm_end_callback",
+        [(cg.uint8, "code"), (cg.const_char_ptr, "message")],
+    ),
+    automation.CallbackAutomation(
+        CONF_ON_STATUS_MESSAGE,
+        "add_status_message_callback",
+        [(cg.const_char_ptr, "data"), (cg.size_t, "data_size")],
+    ),
+)
 
 
 async def to_code(config):
@@ -497,26 +513,6 @@ async def to_code(config):
         cg.add(
             var.set_status_message_header_size(config[CONF_STATUS_MESSAGE_HEADER_SIZE])
         )
-    for conf in config.get(CONF_ON_ALARM_START, []):
-        await automation.build_callback_automation(
-            var,
-            "add_alarm_start_callback",
-            [(cg.uint8, "code"), (cg.const_char_ptr, "message")],
-            conf,
-        )
-    for conf in config.get(CONF_ON_ALARM_END, []):
-        await automation.build_callback_automation(
-            var,
-            "add_alarm_end_callback",
-            [(cg.uint8, "code"), (cg.const_char_ptr, "message")],
-            conf,
-        )
-    for conf in config.get(CONF_ON_STATUS_MESSAGE, []):
-        await automation.build_callback_automation(
-            var,
-            "add_status_message_callback",
-            [(cg.const_char_ptr, "data"), (cg.size_t, "data_size")],
-            conf,
-        )
+    await automation.build_callback_automations(var, config, _CALLBACK_AUTOMATIONS)
     # https://github.com/paveldn/HaierProtocol
     cg.add_library("pavlodn/HaierProtocol", "0.9.31")
