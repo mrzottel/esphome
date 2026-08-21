@@ -125,6 +125,16 @@ static void dump_bytes_field(DumpBuffer &out, const char *field_name, const uint
 }
 #pragma GCC diagnostic pop
 
+template<> const char *proto_enum_to_string<enums::DisconnectReason>(enums::DisconnectReason value) {
+  switch (value) {
+    case enums::DISCONNECT_REASON_UNSPECIFIED:
+      return ESPHOME_PSTR("DISCONNECT_REASON_UNSPECIFIED");
+    case enums::DISCONNECT_REASON_PROVISIONING_CLOSED:
+      return ESPHOME_PSTR("DISCONNECT_REASON_PROVISIONING_CLOSED");
+    default:
+      return ESPHOME_PSTR("UNKNOWN");
+  }
+}
 template<> const char *proto_enum_to_string<enums::SerialProxyPortType>(enums::SerialProxyPortType value) {
   switch (value) {
     case enums::SERIAL_PROXY_PORT_TYPE_TTL:
@@ -297,6 +307,18 @@ template<> const char *proto_enum_to_string<enums::SupportsResponseType>(enums::
   }
 }
 #endif
+template<> const char *proto_enum_to_string<enums::TemperatureUnit>(enums::TemperatureUnit value) {
+  switch (value) {
+    case enums::TEMPERATURE_UNIT_CELSIUS:
+      return ESPHOME_PSTR("TEMPERATURE_UNIT_CELSIUS");
+    case enums::TEMPERATURE_UNIT_FAHRENHEIT:
+      return ESPHOME_PSTR("TEMPERATURE_UNIT_FAHRENHEIT");
+    case enums::TEMPERATURE_UNIT_KELVIN:
+      return ESPHOME_PSTR("TEMPERATURE_UNIT_KELVIN");
+    default:
+      return ESPHOME_PSTR("UNKNOWN");
+  }
+}
 #ifdef USE_CLIMATE
 template<> const char *proto_enum_to_string<enums::ClimateMode>(enums::ClimateMode value) {
   switch (value) {
@@ -475,6 +497,10 @@ template<> const char *proto_enum_to_string<enums::LockState>(enums::LockState v
       return ESPHOME_PSTR("LOCK_STATE_LOCKING");
     case enums::LOCK_STATE_UNLOCKING:
       return ESPHOME_PSTR("LOCK_STATE_UNLOCKING");
+    case enums::LOCK_STATE_OPENING:
+      return ESPHOME_PSTR("LOCK_STATE_OPENING");
+    case enums::LOCK_STATE_OPEN:
+      return ESPHOME_PSTR("LOCK_STATE_OPEN");
     default:
       return ESPHOME_PSTR("UNKNOWN");
   }
@@ -558,7 +584,7 @@ template<> const char *proto_enum_to_string<enums::MediaPlayerFormatPurpose>(enu
   }
 }
 #endif
-#ifdef USE_BLUETOOTH_PROXY
+#ifdef USE_BLUETOOTH_PROXY_CONNECTIONS
 template<>
 const char *proto_enum_to_string<enums::BluetoothDeviceRequestType>(enums::BluetoothDeviceRequestType value) {
   switch (value) {
@@ -580,6 +606,8 @@ const char *proto_enum_to_string<enums::BluetoothDeviceRequestType>(enums::Bluet
       return ESPHOME_PSTR("UNKNOWN");
   }
 }
+#endif
+#ifdef USE_BLUETOOTH_PROXY
 template<> const char *proto_enum_to_string<enums::BluetoothScannerState>(enums::BluetoothScannerState value) {
   switch (value) {
     case enums::BLUETOOTH_SCANNER_STATE_IDLE:
@@ -848,7 +876,8 @@ const char *HelloResponse::dump_to(DumpBuffer &out) const {
   return out.c_str();
 }
 const char *DisconnectRequest::dump_to(DumpBuffer &out) const {
-  out.append_p(ESPHOME_PSTR("DisconnectRequest {}"));
+  MessageDumpHelper helper(out, ESPHOME_PSTR("DisconnectRequest"));
+  dump_field(out, ESPHOME_PSTR("reason"), static_cast<enums::DisconnectReason>(this->reason));
   return out.c_str();
 }
 const char *DisconnectResponse::dump_to(DumpBuffer &out) const {
@@ -948,6 +977,58 @@ const char *DeviceInfoResponse::dump_to(DumpBuffer &out) const {
 #endif
 #ifdef USE_ZWAVE_PROXY
   dump_field(out, ESPHOME_PSTR("zwave_home_id"), this->zwave_home_id);
+#endif
+#ifdef USE_SERIAL_PROXY
+  for (const auto &it : this->serial_proxies) {
+    out.append(4, ' ').append_p(ESPHOME_PSTR("serial_proxies")).append(": ");
+    it.dump_to(out);
+    out.append("\n");
+  }
+#endif
+#ifdef USE_API_NOISE
+  dump_field(out, ESPHOME_PSTR("api_encryption_provisionable"), this->api_encryption_provisionable);
+#endif
+  return out.c_str();
+}
+#ifdef USE_BLUETOOTH_PROXY
+const char *BluetoothProxyCapabilities::dump_to(DumpBuffer &out) const {
+  MessageDumpHelper helper(out, ESPHOME_PSTR("BluetoothProxyCapabilities"));
+  dump_field(out, ESPHOME_PSTR("feature_flags"), this->feature_flags);
+  dump_field(out, ESPHOME_PSTR("mac_address"), this->mac_address);
+  return out.c_str();
+}
+#endif
+#ifdef USE_VOICE_ASSISTANT
+const char *VoiceAssistantCapabilities::dump_to(DumpBuffer &out) const {
+  MessageDumpHelper helper(out, ESPHOME_PSTR("VoiceAssistantCapabilities"));
+  dump_field(out, ESPHOME_PSTR("feature_flags"), this->feature_flags);
+  return out.c_str();
+}
+#endif
+#ifdef USE_ZWAVE_PROXY
+const char *ZWaveProxyCapabilities::dump_to(DumpBuffer &out) const {
+  MessageDumpHelper helper(out, ESPHOME_PSTR("ZWaveProxyCapabilities"));
+  dump_field(out, ESPHOME_PSTR("feature_flags"), this->feature_flags);
+  dump_field(out, ESPHOME_PSTR("home_id"), this->home_id);
+  return out.c_str();
+}
+#endif
+const char *DeviceCapabilitiesResponse::dump_to(DumpBuffer &out) const {
+  MessageDumpHelper helper(out, ESPHOME_PSTR("DeviceCapabilitiesResponse"));
+#ifdef USE_BLUETOOTH_PROXY
+  out.append(2, ' ').append_p(ESPHOME_PSTR("bluetooth_proxy")).append(": ");
+  this->bluetooth_proxy.dump_to(out);
+  out.append("\n");
+#endif
+#ifdef USE_VOICE_ASSISTANT
+  out.append(2, ' ').append_p(ESPHOME_PSTR("voice_assistant")).append(": ");
+  this->voice_assistant.dump_to(out);
+  out.append("\n");
+#endif
+#ifdef USE_ZWAVE_PROXY
+  out.append(2, ' ').append_p(ESPHOME_PSTR("zwave_proxy")).append(": ");
+  this->zwave_proxy.dump_to(out);
+  out.append("\n");
 #endif
 #ifdef USE_SERIAL_PROXY
   for (const auto &it : this->serial_proxies) {
@@ -1539,6 +1620,7 @@ const char *ListEntitiesClimateResponse::dump_to(DumpBuffer &out) const {
   dump_field(out, ESPHOME_PSTR("device_id"), this->device_id);
 #endif
   dump_field(out, ESPHOME_PSTR("feature_flags"), this->feature_flags);
+  dump_field(out, ESPHOME_PSTR("temperature_unit"), static_cast<enums::TemperatureUnit>(this->temperature_unit));
   return out.c_str();
 }
 const char *ClimateStateResponse::dump_to(DumpBuffer &out) const {
@@ -1612,6 +1694,7 @@ const char *ListEntitiesWaterHeaterResponse::dump_to(DumpBuffer &out) const {
     dump_field(out, ESPHOME_PSTR("supported_modes"), static_cast<enums::WaterHeaterMode>(it), 4);
   }
   dump_field(out, ESPHOME_PSTR("supported_features"), this->supported_features);
+  dump_field(out, ESPHOME_PSTR("temperature_unit"), static_cast<enums::TemperatureUnit>(this->temperature_unit));
   return out.c_str();
 }
 const char *WaterHeaterStateResponse::dump_to(DumpBuffer &out) const {
@@ -1921,6 +2004,8 @@ const char *BluetoothLERawAdvertisementsResponse::dump_to(DumpBuffer &out) const
   }
   return out.c_str();
 }
+#endif
+#ifdef USE_BLUETOOTH_PROXY_CONNECTIONS
 const char *BluetoothDeviceRequest::dump_to(DumpBuffer &out) const {
   MessageDumpHelper helper(out, ESPHOME_PSTR("BluetoothDeviceRequest"));
   dump_field(out, ESPHOME_PSTR("address"), this->address);
@@ -2092,6 +2177,8 @@ const char *BluetoothDeviceClearCacheResponse::dump_to(DumpBuffer &out) const {
   dump_field(out, ESPHOME_PSTR("error"), this->error);
   return out.c_str();
 }
+#endif
+#ifdef USE_BLUETOOTH_PROXY
 const char *BluetoothScannerStateResponse::dump_to(DumpBuffer &out) const {
   MessageDumpHelper helper(out, ESPHOME_PSTR("BluetoothScannerStateResponse"));
   dump_field(out, ESPHOME_PSTR("state"), static_cast<enums::BluetoothScannerState>(this->state));
@@ -2156,6 +2243,7 @@ const char *VoiceAssistantAudio::dump_to(DumpBuffer &out) const {
   MessageDumpHelper helper(out, ESPHOME_PSTR("VoiceAssistantAudio"));
   dump_bytes_field(out, ESPHOME_PSTR("data"), this->data, this->data_len);
   dump_field(out, ESPHOME_PSTR("end"), this->end);
+  dump_bytes_field(out, ESPHOME_PSTR("data2"), this->data2, this->data2_len);
   return out.c_str();
 }
 const char *VoiceAssistantTimerEventResponse::dump_to(DumpBuffer &out) const {
@@ -2576,7 +2664,7 @@ const char *ListEntitiesInfraredResponse::dump_to(DumpBuffer &out) const {
   return out.c_str();
 }
 #endif
-#ifdef USE_IR_RF
+#if defined(USE_IR_RF) || defined(USE_RADIO_FREQUENCY)
 const char *InfraredRFTransmitRawTimingsRequest::dump_to(DumpBuffer &out) const {
   MessageDumpHelper helper(out, ESPHOME_PSTR("InfraredRFTransmitRawTimingsRequest"));
 #ifdef USE_DEVICES
@@ -2591,6 +2679,7 @@ const char *InfraredRFTransmitRawTimingsRequest::dump_to(DumpBuffer &out) const 
   out.append_p(ESPHOME_PSTR(" values, "));
   append_uint(out, this->timings_length_);
   out.append_p(ESPHOME_PSTR(" bytes]\n"));
+  dump_field(out, ESPHOME_PSTR("modulation"), this->modulation);
   return out.c_str();
 }
 const char *InfraredRFReceiveEvent::dump_to(DumpBuffer &out) const {
@@ -2602,6 +2691,27 @@ const char *InfraredRFReceiveEvent::dump_to(DumpBuffer &out) const {
   for (const auto &it : *this->timings) {
     dump_field(out, ESPHOME_PSTR("timings"), it, 4);
   }
+  return out.c_str();
+}
+#endif
+#ifdef USE_RADIO_FREQUENCY
+const char *ListEntitiesRadioFrequencyResponse::dump_to(DumpBuffer &out) const {
+  MessageDumpHelper helper(out, ESPHOME_PSTR("ListEntitiesRadioFrequencyResponse"));
+  dump_field(out, ESPHOME_PSTR("object_id"), this->object_id);
+  dump_field(out, ESPHOME_PSTR("key"), this->key);
+  dump_field(out, ESPHOME_PSTR("name"), this->name);
+#ifdef USE_ENTITY_ICON
+  dump_field(out, ESPHOME_PSTR("icon"), this->icon);
+#endif
+  dump_field(out, ESPHOME_PSTR("disabled_by_default"), this->disabled_by_default);
+  dump_field(out, ESPHOME_PSTR("entity_category"), static_cast<enums::EntityCategory>(this->entity_category));
+#ifdef USE_DEVICES
+  dump_field(out, ESPHOME_PSTR("device_id"), this->device_id);
+#endif
+  dump_field(out, ESPHOME_PSTR("capabilities"), this->capabilities);
+  dump_field(out, ESPHOME_PSTR("frequency_min"), this->frequency_min);
+  dump_field(out, ESPHOME_PSTR("frequency_max"), this->frequency_max);
+  dump_field(out, ESPHOME_PSTR("supported_modulations"), this->supported_modulations);
   return out.c_str();
 }
 #endif
@@ -2660,7 +2770,7 @@ const char *SerialProxyRequestResponse::dump_to(DumpBuffer &out) const {
   return out.c_str();
 }
 #endif
-#ifdef USE_BLUETOOTH_PROXY
+#ifdef USE_BLUETOOTH_PROXY_CONNECTIONS
 const char *BluetoothSetConnectionParamsRequest::dump_to(DumpBuffer &out) const {
   MessageDumpHelper helper(out, ESPHOME_PSTR("BluetoothSetConnectionParamsRequest"));
   dump_field(out, ESPHOME_PSTR("address"), this->address);

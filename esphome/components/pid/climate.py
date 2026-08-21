@@ -3,6 +3,9 @@ import esphome.codegen as cg
 from esphome.components import climate, output, sensor
 import esphome.config_validation as cv
 from esphome.const import CONF_HUMIDITY_SENSOR, CONF_ID, CONF_SENSOR
+from esphome.core import ID
+from esphome.cpp_generator import MockObj, TemplateArgsType
+from esphome.types import ConfigType
 
 pid_ns = cg.esphome_ns.namespace("pid")
 PIDClimate = pid_ns.class_("PIDClimate", climate.Climate, cg.Component)
@@ -82,7 +85,7 @@ CONFIG_SCHEMA = cv.All(
 )
 
 
-async def to_code(config):
+async def to_code(config: ConfigType) -> None:
     var = await climate.new_climate(config)
     await cg.register_component(var, config)
 
@@ -141,7 +144,12 @@ async def to_code(config):
     ),
     synchronous=True,
 )
-async def pid_reset_integral_term(config, action_id, template_arg, args):
+async def pid_reset_integral_term(
+    config: ConfigType,
+    action_id: ID,
+    template_arg: cg.TemplateArguments,
+    args: TemplateArgsType,
+) -> MockObj:
     paren = await cg.get_variable(config[CONF_ID])
     return cg.new_Pvariable(action_id, template_arg, paren)
 
@@ -163,7 +171,12 @@ async def pid_reset_integral_term(config, action_id, template_arg, args):
     ),
     synchronous=True,
 )
-async def esp8266_set_frequency_to_code(config, action_id, template_arg, args):
+async def esp8266_set_frequency_to_code(
+    config: ConfigType,
+    action_id: ID,
+    template_arg: cg.TemplateArguments,
+    args: TemplateArgsType,
+) -> MockObj:
     paren = await cg.get_variable(config[CONF_ID])
     var = cg.new_Pvariable(action_id, template_arg, paren)
     cg.add(var.set_noiseband(config[CONF_NOISEBAND]))
@@ -185,17 +198,22 @@ async def esp8266_set_frequency_to_code(config, action_id, template_arg, args):
     ),
     synchronous=True,
 )
-async def set_control_parameters(config, action_id, template_arg, args):
+async def set_control_parameters(
+    config: ConfigType,
+    action_id: ID,
+    template_arg: cg.TemplateArguments,
+    args: TemplateArgsType,
+) -> MockObj:
     paren = await cg.get_variable(config[CONF_ID])
     var = cg.new_Pvariable(action_id, template_arg, paren)
 
-    kp_template_ = await cg.templatable(config[CONF_KP], args, float)
+    kp_template_ = await cg.templatable(config[CONF_KP], args, cg.float_)
     cg.add(var.set_kp(kp_template_))
 
-    ki_template_ = await cg.templatable(config[CONF_KI], args, float)
+    ki_template_ = await cg.templatable(config[CONF_KI], args, cg.float_)
     cg.add(var.set_ki(ki_template_))
 
-    kd_template_ = await cg.templatable(config[CONF_KD], args, float)
+    kd_template_ = await cg.templatable(config[CONF_KD], args, cg.float_)
     cg.add(var.set_kd(kd_template_))
 
     return var
